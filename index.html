@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SGQ · Qualidade Carmak</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root,[data-theme="verde"]{
+  --navy:#06402B;--navy-2:#0A5A3C;--accent:#D4B56A;--gold:#C4A35A;
+  --page:#EBF3EF;--tint:#F0F5F2;--line:#D0DDD6;--ink:#0A1A14;--ink-2:#3A4F45;--muted:#5A6E64;
+  --ok:#2F6B4F;--warn:#8A6B00;--bad:#C6483E;--card:#fff;--top1:#032418;--top2:#06402B;
+}
+[data-theme="navy"]{
+  --navy:#0B1D36;--navy-2:#132F4C;--page:#EEF1F6;--tint:#F0F3F7;--line:#D5DCE6;--ink:#0E1520;--ink-2:#3A4556;--muted:#5A6575;
+  --top1:#061018;--top2:#0B1D36;
+}
+[data-theme="grafite"]{
+  --navy:#1A1A1A;--navy-2:#2D2D2D;--page:#F5F4F1;--tint:#FAF9F6;--line:#E5E2DA;--ink:#141414;--ink-2:#4A4A45;--muted:#6B6B63;
+  --top1:#111;--top2:#1A1A1A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,sans-serif;background:var(--page);color:var(--ink);min-height:100vh}
+button,input,select,textarea{font-family:inherit}
+#login{position:fixed;inset:0;z-index:9999;background:linear-gradient(155deg,var(--top1),var(--top2));display:flex;align-items:center;justify-content:center;padding:1.5rem}
+#login.hidden{display:none}
+.login-card{width:100%;max-width:380px;background:rgba(255,255,255,.08);border:1px solid rgba(212,181,106,.4);border-radius:18px;padding:2rem;backdrop-filter:blur(10px)}
+.login-card h1{color:#fff;font-family:Space Grotesk,sans-serif;font-size:1.25rem;text-align:center;margin-bottom:.25rem}
+.login-card p{color:#E8D5A3;font-size:.82rem;text-align:center;margin-bottom:1.25rem}
+.login-card label{display:block;color:#E8D5A3;font-size:.75rem;font-weight:600;margin-bottom:.25rem}
+.login-card input{width:100%;padding:.65rem .85rem;border-radius:8px;border:1px solid rgba(212,181,106,.35);margin-bottom:.85rem;font-size:.95rem}
+.login-card .btn{width:100%;padding:.75rem;border:none;border-radius:8px;background:linear-gradient(135deg,#C4A35A,#a3812f);color:#042e1f;font-weight:800;cursor:pointer;font-size:1rem}
+.login-err{display:none;background:rgba(164,52,74,.3);color:#ffc9d0;padding:.5rem;border-radius:8px;font-size:.85rem;margin-bottom:.75rem;text-align:center}
+.login-err.show{display:block}
+#app{display:none;min-height:100vh}
+#app.on{display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:100;background:linear-gradient(135deg,var(--top1),var(--top2));color:#fff;height:60px;padding:0 16px;display:flex;align-items:center;gap:12px;border-bottom:3px solid var(--accent);flex-wrap:wrap}
+.topbar .brand{font-family:Space Grotesk,sans-serif;font-weight:700;font-size:15px;cursor:pointer}
+.topbar .brand span{display:block;font-size:10px;color:#E8D5A3;font-weight:500;font-family:Inter,sans-serif}
+.nav-mods{display:flex;gap:4px;flex-wrap:wrap;flex:1}
+.nav-mods button{appearance:none;border:none;background:transparent;color:rgba(255,255,255,.75);padding:8px 12px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer}
+.nav-mods button:hover{background:rgba(255,255,255,.12);color:#fff}
+.nav-mods button.on{background:rgba(255,255,255,.95);color:var(--navy)}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.chip{font-size:11px;color:#E8D5A3;border:1px solid rgba(212,181,106,.35);padding:4px 10px;border-radius:100px}
+.btn-out{appearance:none;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer}
+.main{flex:1;padding:20px 24px;max-width:1400px;margin:0 auto;width:100%}
+.view{display:none}.view.on{display:block;animation:f .2s ease}
+@keyframes f{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.page-h{margin-bottom:16px}
+.page-h h1{font-family:Space Grotesk,sans-serif;font-size:22px;color:var(--navy);margin-bottom:4px}
+.page-h p{font-size:13px;color:var(--muted)}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 4px 14px rgba(0,0,0,.05);position:relative;overflow:hidden}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
+.kpi .l{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;margin-bottom:6px}
+.kpi .v{font-family:Space Grotesk,sans-serif;font-size:26px;font-weight:700;color:var(--navy)}
+.kpi .s{font-size:11px;color:var(--muted);margin-top:4px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 4px 14px rgba(0,0,0,.05);margin-bottom:14px}
+.panel h3{font-family:Space Grotesk,sans-serif;font-size:15px;margin-bottom:10px;color:var(--navy)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:12px}
+.toolbar .fg{display:flex;flex-direction:column;gap:4px}
+.toolbar label{font-size:10px;text-transform:uppercase;font-weight:700;color:var(--muted)}
+.toolbar input,.toolbar select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;min-width:120px}
+.btn{appearance:none;border:none;border-radius:8px;padding:8px 14px;font-weight:600;font-size:13px;cursor:pointer}
+.btn-p{background:var(--navy);color:#fff}
+.btn-g{background:linear-gradient(135deg,var(--gold),#a3812f);color:#042e1f}
+.btn-s{background:#e8ece9;color:var(--ink-2)}
+.btn-d{background:#fbe4e8;color:var(--bad)}
+.btn:hover{filter:brightness(1.05)}
+.table-wrap{overflow:auto;max-height:60vh;border:1px solid var(--line);border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{position:sticky;top:0;background:var(--navy);color:#fff;text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+td{padding:8px 12px;border-bottom:1px solid var(--line);color:var(--ink-2)}
+tr:hover td{background:var(--tint)}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.badge.ok{background:#E4F5EE;color:var(--ok)}
+.badge.warn{background:#FFF6DF;color:var(--warn)}
+.badge.bad{background:#FBEAE8;color:var(--bad)}
+.badge.off{background:#EBEDF0;color:#565D6B}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:1rem}
+.modal-bg.on{display:flex}
+.modal{background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:90vh;overflow:auto;padding:1.25rem 1.4rem;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modal h2{font-family:Space Grotesk,sans-serif;font-size:18px;margin-bottom:12px;color:var(--navy)}
+.modal .fg{margin-bottom:10px}
+.modal label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:3px}
+.modal input,.modal select,.modal textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px}
+.modal textarea{min-height:70px;resize:vertical}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:800px){.grid2{grid-template-columns:1fr}.nav-mods{width:100%}.kpi-row{grid-template-columns:repeat(2,1fr)}}
+.alert{padding:12px 14px;border-radius:10px;margin-bottom:12px;font-size:13px}
+.alert.warn{background:#FFF6DF;border:1px solid #e0c56a;color:#8a6b00}
+.alert.ok{background:#E4F5EE;border:1px solid #b8e0cc;color:var(--ok)}
+.foot{text-align:center;padding:20px;font-size:11px;color:var(--muted)}
+.asec-note{font-size:13px;color:var(--ink-2);line-height:1.5}
+.asec-note a{color:var(--navy);font-weight:600}
+</style>
+</head>
+<body>
+<div id="login">
+  <div class="login-card">
+    <h1>SGQ · Qualidade Carmak</h1>
+    <p>Acesso restrito · Uso interno</p>
+    <div class="login-err" id="loginErr">Senha incorreta</div>
+    <label>Usuário</label>
+    <input type="text" id="loginUser" value="qualidade" autocomplete="username">
+    <label>Senha</label>
+    <input type="password" id="loginPass" autocomplete="current-password" placeholder="Senha">
+    <button type="button" class="btn" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<div id="app">
+  <header class="topbar">
+    <div class="brand" onclick="showMod('dash')">SGQ Carmak<span>Sistema de Gestão da Qualidade</span></div>
+    <nav class="nav-mods" id="navMods">
+      <button type="button" data-m="dash" class="on">Dashboard</button>
+      <button type="button" data-m="docs">Lista Mestra</button>
+      <button type="button" data-m="flux">Fluxogramas</button>
+      <button type="button" data-m="trein">Treinamentos</button>
+      <button type="button" data-m="asec">ASEC</button>
+      <button type="button" data-m="metro">Metrologia</button>
+    </nav>
+    <div class="top-right">
+      <span class="chip" id="userChip">Qualidade</span>
+      <button type="button" class="btn-out" onclick="doLogout()">Sair</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- DASHBOARD -->
+    <section class="view on" id="view-dash">
+      <div class="page-h"><h1>Dashboard</h1><p>Visão consolidada dos módulos · atualiza conforme você edita Lista Mestra, Fluxogramas, Treinamentos e Metrologia</p></div>
+      <div class="kpi-row" id="dashKpis"></div>
+      <div class="grid2">
+        <div class="panel"><h3>Alertas</h3><div id="dashAlerts"></div></div>
+        <div class="panel"><h3>Resumo rápido</h3><div id="dashSummary" style="font-size:13px;line-height:1.7;color:var(--ink-2)"></div></div>
+      </div>
+      <div class="panel">
+        <h3>Importar planilha base (Excel)</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Opcional: importa KPIs / Metrologia para alimentar os módulos. Depois edite pelo CRUD.</p>
+        <div class="toolbar">
+          <input type="file" id="importXlsx" accept=".xlsx,.xls">
+          <button type="button" class="btn btn-s" onclick="exportBackup()">Exportar backup JSON</button>
+          <button type="button" class="btn btn-d" onclick="resetAllData()">Limpar dados locais</button>
+        </div>
+        <div id="importStatus" style="font-size:12px;color:var(--muted)"></div>
+      </div>
+    </section>
+
+    <!-- LISTA MESTRA -->
+    <section class="view" id="view-docs">
+      <div class="page-h"><h1>Lista Mestra · Documentos</h1><p>CRUD completo · o Dashboard reflete estes dados</p></div>
+      <div class="toolbar">
+        <div class="fg"><label>Busca</label><input id="docSearch" placeholder="Código ou título" oninput="renderDocs()"></div>
+        <div class="fg"><label>Área</label><select id="docArea" onchange="renderDocs()"><option value="">Todas</option></select></div>
+        <div class="fg"><label>Status</label><select id="docStatus" onchange="renderDocs()">
+          <option value="">Todos</option><option>Em dia</option><option>Vence em 30 dias</option><option>Vence em 90 dias</option><option>Vencido</option>
+        </select></div>
+        <button type="button" class="btn btn-g" onclick="openDocModal()">+ Novo documento</button>
+      </div>
+      <div class="table-wrap"><table><thead><tr>
+        <th>Código</th><th>Título</th><th>Área</th><th>Tipo</th><th>Próx. revisão</th><th>Status</th><th>Ações</th>
+      </tr></thead><tbody id="docBody"></tbody></table></div>
+    </section>
+
+    <!-- FLUXOGRAMAS -->
+    <section class="view" id="view-flux">
+      <div class="page-h"><h1>Fluxogramas · Processos</h1><p>CRUD · status de mapeamento por área</p></div>
+      <div class="kpi-row" id="fluxKpis"></div>
+      <div class="toolbar">
+        <div class="fg"><label>Busca</label><input id="fluxSearch" placeholder="Processo ou área" oninput="renderFlux()"></div>
+        <div class="fg"><label>Status</label><select id="fluxStatus" onchange="renderFlux()">
+          <option value="">Todos</option><option>Finalizado</option><option>Em Andamento</option><option>Aguardando Revisão</option><option>Não Iniciado</option>
+        </select></div>
+        <button type="button" class="btn btn-g" onclick="openFluxModal()">+ Novo fluxograma</button>
+      </div>
+      <div class="table-wrap"><table><thead><tr>
+        <th>Área</th><th>Processo</th><th>Status</th><th>Observações</th><th>Ações</th>
+      </tr></thead><tbody id="fluxBody"></tbody></table></div>
+    </section>
+
+    <!-- TREINAMENTOS -->
+    <section class="view" id="view-trein">
+      <div class="page-h"><h1>Treinamentos técnicos TO/BT</h1><p>Indicadores + cadastro de técnicos e status por módulo</p></div>
+      <div class="kpi-row" id="treinKpis"></div>
+      <div class="toolbar">
+        <div class="fg"><label>Busca</label><input id="treinSearch" placeholder="Nome ou região" oninput="renderTrein()"></div>
+        <button type="button" class="btn btn-g" onclick="openTreinModal()">+ Novo técnico</button>
+      </div>
+      <div class="table-wrap"><table><thead><tr>
+        <th>Nome</th><th>Região</th><th>% Concluído</th><th>Módulos (resumo)</th><th>Ações</th>
+      </tr></thead><tbody id="treinBody"></tbody></table></div>
+    </section>
+
+    <!-- ASEC -->
+    <section class="view" id="view-asec">
+      <div class="page-h"><h1>ASEC Toyota</h1><p>Indicadores + origem dos dados: checklist de auditoria</p></div>
+      <div class="kpi-row" id="asecKpis"></div>
+      <div class="panel">
+        <h3>Checklist de auditoria (operação)</h3>
+        <p class="asec-note">
+          O preenchimento das auditorias (conforme / NC / fotos / PDF) continua no módulo dedicado de checklist ASEC,
+          que grava no Supabase. Os números de <b>auditorias realizadas, NC e assertividade</b> alimentam este painel
+          via planilha (aba 03/04) ou, na próxima fase, automaticamente a partir dos relatórios salvos.
+        </p>
+        <div class="toolbar" style="margin-top:12px">
+          <button type="button" class="btn btn-p" onclick="window.open('https://qualidadecarmak.github.io/','_blank')">Abrir portal / checklist ASEC</button>
+          <button type="button" class="btn btn-s" onclick="alert('Na fase 2 o checklist entra embutido neste mesmo HTML com a mesma base Supabase.')">Em breve: checklist embutido</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Indicadores manuais (planilha)</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Edite os totais YTD usados no dashboard ASEC até a integração automática.</p>
+        <div class="toolbar">
+          <div class="fg"><label>Auditorias realizadas (YTD)</label><input type="number" id="asecReal" min="0" style="width:100px"></div>
+          <div class="fg"><label>Planejadas (YTD)</label><input type="number" id="asecPlan" min="0" style="width:100px"></div>
+          <div class="fg"><label>NC acumuladas</label><input type="number" id="asecNc" min="0" style="width:100px"></div>
+          <div class="fg"><label>Sugestões</label><input type="number" id="asecSug" min="0" style="width:100px"></div>
+          <button type="button" class="btn btn-g" onclick="saveAsecManual()">Salvar</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- METROLOGIA -->
+    <section class="view" id="view-metro">
+      <div class="page-h"><h1>Metrologia · Calibrações</h1><p>CRUD de instrumentos · status de validade · ISO 9001 7.1.5</p></div>
+      <div class="kpi-row" id="metroKpis"></div>
+      <div class="toolbar">
+        <div class="fg"><label>Busca</label><input id="metroSearch" placeholder="Equipamento ou série" oninput="renderMetro()"></div>
+        <div class="fg"><label>Status</label><select id="metroStatus" onchange="renderMetro()">
+          <option value="">Todos</option><option>Em dia</option><option>Vence em 30 dias</option><option>Vence em 90 dias</option><option>Vencido</option><option>Sem data</option>
+        </select></div>
+        <button type="button" class="btn btn-g" onclick="openMetroModal()">+ Novo instrumento</button>
+      </div>
+      <div class="table-wrap"><table><thead><tr>
+        <th>Equipamento</th><th>Série</th><th>Tipo</th><th>Última</th><th>Próxima</th><th>Status</th><th>Ações</th>
+      </tr></thead><tbody id="metroBody"></tbody></table></div>
+    </section>
+  </div>
+  <div class="foot">SGQ Carmak · Uso interno · Dados locais no navegador (fase 1) · Supabase na fase 2</div>
+</div>
+
+<!-- Modal genérico -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal" id="modalBox"></div>
+</div>
+
+<script>
+/* ========== AUTH (1 usuário master) ========== */
+const AUTH_USER = "qualidade";
+const AUTH_PASS = "Carmak@SGQ2026"; // altere após o primeiro acesso
+const LS = "carmak_sgq_v1";
+
+function doLogin(){
+  const u = (document.getElementById("loginUser").value||"").trim().toLowerCase();
+  const p = document.getElementById("loginPass").value||"";
+  const err = document.getElementById("loginErr");
+  if(u === AUTH_USER && p === AUTH_PASS){
+    sessionStorage.setItem("sgq_ok","1");
+    err.classList.remove("show");
+    enterApp();
+  } else {
+    err.textContent = "Usuário ou senha inválidos";
+    err.classList.add("show");
+  }
+}
+function doLogout(){
+  sessionStorage.removeItem("sgq_ok");
+  document.getElementById("app").classList.remove("on");
+  document.getElementById("login").classList.remove("hidden");
+  document.getElementById("loginPass").value = "";
+}
+function enterApp(){
+  document.getElementById("login").classList.add("hidden");
+  document.getElementById("app").classList.add("on");
+  loadDB();
+  renderAll();
+}
+document.getElementById("loginPass").addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
+
+/* ========== DATA ========== */
+const MODULES_T = [
+  "STEP 1 TO/BT Módulo 1","STEP 1 TO/BT Módulo 2","STEP 1 TO/BT Módulo 3",
+  "STEP 2 TO Módulo 1","STEP 2 TO Módulo 2","STEP 2 TO Módulo 3",
+  "STEP 3 TO Módulo 1","STEP 3 TO Módulo 2","STEP 3 TO Módulo 3",
+  "STEP 1 BT","STEP 2 BT"
+];
+
+let DB = {
+  docs: [],
+  fluxos: [],
+  people: [],
+  instruments: [],
+  asec: { realizadas:0, planejadas:0, nc:0, sugestoes:0 }
+};
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+function loadDB(){
+  try{
+    const raw = localStorage.getItem(LS);
+    if(raw){
+      const p = JSON.parse(raw);
+      DB = Object.assign(DB, p);
+    } else {
+      seedMinimal();
+      saveDB();
+    }
+  }catch(e){ seedMinimal(); }
+}
+function saveDB(){
+  localStorage.setItem(LS, JSON.stringify(DB));
+}
+function seedMinimal(){
+  DB.docs = [
+    {id:uid(), codigo:"PQ-001", titulo:"Manual da Qualidade", area:"Qualidade", tipo:"PQ", revisao:"2026-12-01", situacao:"Ativo", criticidade:"Alta"}
+  ];
+  DB.fluxos = [
+    {id:uid(), area:"Qualidade", processo:"Controle de documentos", status:"Finalizado", obs:""}
+  ];
+  DB.people = [
+    {id:uid(), nome:"Exemplo Técnico", regiao:"São Leopoldo, RS", mods:{}}
+  ];
+  DB.instruments = [
+    {id:uid(), equipamento:"Paquímetro 0-150mm", tipo:"Paquímetro", serie:"20041759", periodicidade:12, ultima:null, situacao:"Ativo", emp:"±0,04", prioridade:"Alta"}
+  ];
+  DB.asec = { realizadas:0, planejadas:0, nc:0, sugestoes:0 };
+}
+
+/* status helpers */
+function daysUntil(iso){
+  if(!iso) return null;
+  const d = new Date(iso+"T12:00:00");
+  if(isNaN(d)) return null;
+  const now = new Date(); now.setHours(12,0,0,0);
+  return Math.round((d-now)/86400000);
+}
+function statusFromDate(iso, situacao){
+  if(situacao && /obsoleto|cancelado|inativo/i.test(situacao)) return "Obsoleto";
+  const d = daysUntil(iso);
+  if(d===null) return "Sem data";
+  if(d < 0) return "Vencido";
+  if(d <= 30) return "Vence em 30 dias";
+  if(d <= 90) return "Vence em 90 dias";
+  return "Em dia";
+}
+function badgeClass(st){
+  if(st==="Em dia"||st==="Finalizado"||st==="ok") return "ok";
+  if(/30|90|Andamento|Aguardando|Sem data/i.test(st)) return "warn";
+  if(/Vencido|Não Iniciado|bad/i.test(st)) return "bad";
+  return "off";
+}
+function enrichInst(i){
+  const per = Number(i.periodicidade)||12;
+  let prox = null;
+  if(i.ultima){
+    const d = new Date(i.ultima+"T12:00:00");
+    if(!isNaN(d)){ d.setMonth(d.getMonth()+per); prox = d.toISOString().slice(0,10); }
+  }
+  const st = statusFromDate(prox, i.situacao);
+  return Object.assign({}, i, {proxima:prox, status:st, dias:daysUntil(prox)});
+}
+
+/* ========== NAV ========== */
+document.querySelectorAll("#navMods button").forEach(b=>{
+  b.addEventListener("click", ()=> showMod(b.dataset.m));
+});
+function showMod(m){
+  document.querySelectorAll("#navMods button").forEach(b=> b.classList.toggle("on", b.dataset.m===m));
+  document.querySelectorAll(".view").forEach(v=> v.classList.remove("on"));
+  const el = document.getElementById("view-"+m);
+  if(el) el.classList.add("on");
+  if(m==="dash") renderDash();
+  if(m==="docs") renderDocs();
+  if(m==="flux") renderFlux();
+  if(m==="trein") renderTrein();
+  if(m==="asec") renderAsec();
+  if(m==="metro") renderMetro();
+}
+
+/* ========== DASHBOARD ========== */
+function renderDash(){
+  const docs = DB.docs||[];
+  const flux = DB.fluxos||[];
+  const people = DB.people||[];
+  const inst = (DB.instruments||[]).map(enrichInst);
+  const docVen = docs.filter(d=> statusFromDate(d.revisao,d.situacao)==="Vencido").length;
+  const doc30 = docs.filter(d=> statusFromDate(d.revisao,d.situacao)==="Vence em 30 dias").length;
+  const fluxOk = flux.filter(f=> f.status==="Finalizado").length;
+  const fluxPct = flux.length? Math.round(100*fluxOk/flux.length):0;
+  const instLate = inst.filter(i=> i.status==="Vencido").length;
+  const inst30 = inst.filter(i=> i.status==="Vence em 30 dias").length;
+  document.getElementById("dashKpis").innerHTML = `
+    <div class="kpi"><div class="l">Documentos</div><div class="v">${docs.length}</div><div class="s">${docVen} vencido(s)</div></div>
+    <div class="kpi"><div class="l">Docs · 30 dias</div><div class="v">${doc30}</div><div class="s">revisão próxima</div></div>
+    <div class="kpi"><div class="l">Fluxogramas</div><div class="v">${fluxPct}%</div><div class="s">${fluxOk}/${flux.length} finalizados</div></div>
+    <div class="kpi"><div class="l">Técnicos</div><div class="v">${people.length}</div><div class="s">na base TO/BT</div></div>
+    <div class="kpi"><div class="l">Instrumentos</div><div class="v">${inst.length}</div><div class="s">${instLate} vencido(s)</div></div>
+    <div class="kpi"><div class="l">ASEC · NC YTD</div><div class="v">${DB.asec.nc||0}</div><div class="s">${DB.asec.realizadas||0} auditorias</div></div>
+  `;
+  const alerts = [];
+  if(docVen) alerts.push(`<div class="alert warn"><b>${docVen}</b> documento(s) com revisão vencida na Lista Mestra.</div>`);
+  if(instLate) alerts.push(`<div class="alert warn"><b>${instLate}</b> instrumento(s) com calibração vencida.</div>`);
+  if(inst30) alerts.push(`<div class="alert warn"><b>${inst30}</b> instrumento(s) vencem em 30 dias.</div>`);
+  if(!alerts.length) alerts.push(`<div class="alert ok">Nenhum alerta crítico no momento.</div>`);
+  document.getElementById("dashAlerts").innerHTML = alerts.join("");
+  document.getElementById("dashSummary").innerHTML = `
+    <b>Lista Mestra:</b> ${docs.length} docs · <b>Fluxos:</b> ${flux.length} processos (${fluxPct}% ok)<br>
+    <b>Treinamentos:</b> ${people.length} técnicos · <b>Metrologia:</b> ${inst.length} instrumentos<br>
+    <b>ASEC:</b> ${DB.asec.realizadas||0}/${DB.asec.planejadas||0} realizadas/planejadas · NC ${DB.asec.nc||0}
+  `;
+}
+
+/* ========== DOCS CRUD ========== */
+function renderDocs(){
+  const q = (document.getElementById("docSearch").value||"").toLowerCase();
+  const area = document.getElementById("docArea").value;
+  const st = document.getElementById("docStatus").value;
+  const areas = [...new Set((DB.docs||[]).map(d=>d.area).filter(Boolean))].sort();
+  const sel = document.getElementById("docArea");
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Todas</option>'+areas.map(a=>`<option>${esc(a)}</option>`).join("");
+  sel.value = cur;
+  let rows = DB.docs||[];
+  if(q) rows = rows.filter(d=> (d.codigo+" "+d.titulo).toLowerCase().includes(q));
+  if(area) rows = rows.filter(d=> d.area===area);
+  rows = rows.map(d=> Object.assign({},d,{st:statusFromDate(d.revisao,d.situacao)}));
+  if(st) rows = rows.filter(d=> d.st===st);
+  document.getElementById("docBody").innerHTML = rows.map(d=>`
+    <tr>
+      <td><b>${esc(d.codigo)}</b></td>
+      <td>${esc(d.titulo)}</td>
+      <td>${esc(d.area||"—")}</td>
+      <td>${esc(d.tipo||"—")}</td>
+      <td>${esc(d.revisao||"—")}</td>
+      <td><span class="badge ${badgeClass(d.st)}">${esc(d.st)}</span></td>
+      <td>
+        <button class="btn btn-s" onclick="openDocModal('${d.id}')">Editar</button>
+        <button class="btn btn-d" onclick="delDoc('${d.id}')">Excluir</button>
+      </td>
+    </tr>`).join("") || `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted)">Nenhum documento</td></tr>`;
+}
+function openDocModal(id){
+  const d = id ? (DB.docs||[]).find(x=>x.id===id) : null;
+  document.getElementById("modalBox").innerHTML = `
+    <h2>${d?"Editar":"Novo"} documento</h2>
+    <div class="fg"><label>Código</label><input id="m_codigo" value="${esc(d&&d.codigo||"")}"></div>
+    <div class="fg"><label>Título</label><input id="m_titulo" value="${esc(d&&d.titulo||"")}"></div>
+    <div class="fg"><label>Área</label><input id="m_area" value="${esc(d&&d.area||"")}"></div>
+    <div class="fg"><label>Tipo</label><select id="m_tipo">
+      ${["PQ","PP","RQ","POP","Outro"].map(t=>`<option ${d&&d.tipo===t?"selected":""}>${t}</option>`).join("")}
+    </select></div>
+    <div class="fg"><label>Próxima revisão</label><input type="date" id="m_rev" value="${esc(d&&d.revisao||"")}"></div>
+    <div class="fg"><label>Situação</label><select id="m_sit">
+      ${["Ativo","Obsoleto","Cancelado"].map(t=>`<option ${d&&d.situacao===t?"selected":""}>${t}</option>`).join("")}
+    </select></div>
+    <div class="fg"><label>Criticidade</label><select id="m_crit">
+      ${["Alta","Média","Baixa"].map(t=>`<option ${d&&d.criticidade===t?"selected":""}>${t}</option>`).join("")}
+    </select></div>
+    <div class="modal-actions">
+      <button class="btn btn-s" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-g" onclick="saveDoc('${id||""}')">Salvar</button>
+    </div>`;
+  openModal();
+}
+function saveDoc(id){
+  const row = {
+    id: id||uid(),
+    codigo: document.getElementById("m_codigo").value.trim(),
+    titulo: document.getElementById("m_titulo").value.trim(),
+    area: document.getElementById("m_area").value.trim(),
+    tipo: document.getElementById("m_tipo").value,
+    revisao: document.getElementById("m_rev").value||null,
+    situacao: document.getElementById("m_sit").value,
+    criticidade: document.getElementById("m_crit").value
+  };
+  if(!row.codigo||!row.titulo){ alert("Código e título são obrigatórios."); return; }
+  if(id){
+    const i = DB.docs.findIndex(x=>x.id===id);
+    if(i>=0) DB.docs[i]=row;
+  } else DB.docs.push(row);
+  saveDB(); closeModal(); renderDocs(); renderDash();
+}
+function delDoc(id){
+  if(!confirm("Excluir este documento?")) return;
+  DB.docs = DB.docs.filter(x=>x.id!==id);
+  saveDB(); renderDocs(); renderDash();
+}
+
+/* ========== FLUXOS CRUD ========== */
+function renderFlux(){
+  const q = (document.getElementById("fluxSearch").value||"").toLowerCase();
+  const st = document.getElementById("fluxStatus").value;
+  let rows = DB.fluxos||[];
+  if(q) rows = rows.filter(f=> (f.area+" "+f.processo).toLowerCase().includes(q));
+  if(st) rows = rows.filter(f=> f.status===st);
+  const total = (DB.fluxos||[]).length;
+  const fin = (DB.fluxos||[]).filter(f=>f.status==="Finalizado").length;
+  document.getElementById("fluxKpis").innerHTML = `
+    <div class="kpi"><div class="l">Total</div><div class="v">${total}</div><div class="s">processos</div></div>
+    <div class="kpi"><div class="l">Finalizados</div><div class="v">${fin}</div><div class="s">${total?Math.round(100*fin/total):0}%</div></div>
+    <div class="kpi"><div class="l">Pendentes</div><div class="v">${total-fin}</div><div class="s">não finalizados</div></div>
+  `;
+  document.getElementById("fluxBody").innerHTML = rows.map(f=>`
+    <tr>
+      <td>${esc(f.area)}</td>
+      <td>${esc(f.processo)}</td>
+      <td><span class="badge ${badgeClass(f.status)}">${esc(f.status)}</span></td>
+      <td>${esc(f.obs||"")}</td>
+      <td>
+        <button class="btn btn-s" onclick="openFluxModal('${f.id}')">Editar</button>
+        <button class="btn btn-d" onclick="delFlux('${f.id}')">Excluir</button>
+      </td>
+    </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Nenhum fluxograma</td></tr>`;
+}
+function openFluxModal(id){
+  const f = id ? DB.fluxos.find(x=>x.id===id) : null;
+  document.getElementById("modalBox").innerHTML = `
+    <h2>${f?"Editar":"Novo"} fluxograma</h2>
+    <div class="fg"><label>Área</label><input id="m_farea" value="${esc(f&&f.area||"")}"></div>
+    <div class="fg"><label>Processo</label><input id="m_fproc" value="${esc(f&&f.processo||"")}"></div>
+    <div class="fg"><label>Status</label><select id="m_fst">
+      ${["Finalizado","Em Andamento","Aguardando Revisão","Não Iniciado"].map(t=>`<option ${f&&f.status===t?"selected":""}>${t}</option>`).join("")}
+    </select></div>
+    <div class="fg"><label>Observações</label><textarea id="m_fobs">${esc(f&&f.obs||"")}</textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-s" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-g" onclick="saveFlux('${id||""}')">Salvar</button>
+    </div>`;
+  openModal();
+}
+function saveFlux(id){
+  const row = {
+    id: id||uid(),
+    area: document.getElementById("m_farea").value.trim(),
+    processo: document.getElementById("m_fproc").value.trim(),
+    status: document.getElementById("m_fst").value,
+    obs: document.getElementById("m_fobs").value.trim()
+  };
+  if(!row.area||!row.processo){ alert("Área e processo são obrigatórios."); return; }
+  if(id){ const i=DB.fluxos.findIndex(x=>x.id===id); if(i>=0) DB.fluxos[i]=row; }
+  else DB.fluxos.push(row);
+  saveDB(); closeModal(); renderFlux(); renderDash();
+}
+function delFlux(id){
+  if(!confirm("Excluir este fluxograma?")) return;
+  DB.fluxos = DB.fluxos.filter(x=>x.id!==id);
+  saveDB(); renderFlux(); renderDash();
+}
+
+/* ========== TREINAMENTOS ========== */
+function personPct(p){
+  const mods = p.mods||{};
+  let ok=0;
+  MODULES_T.forEach(m=>{
+    const v = (mods[m]||"").toLowerCase();
+    if(v.includes("conclu")) ok++;
+  });
+  return Math.round(100*ok/MODULES_T.length);
+}
+function renderTrein(){
+  const q = (document.getElementById("treinSearch").value||"").toLowerCase();
+  let rows = DB.people||[];
+  if(q) rows = rows.filter(p=> (p.nome+" "+p.regiao).toLowerCase().includes(q));
+  const total = (DB.people||[]).length;
+  document.getElementById("treinKpis").innerHTML = `
+    <div class="kpi"><div class="l">Técnicos</div><div class="v">${total}</div><div class="s">cadastrados</div></div>
+    <div class="kpi"><div class="l">Módulos no sistema</div><div class="v">${MODULES_T.length}</div><div class="s">STEP/BT</div></div>
+  `;
+  document.getElementById("treinBody").innerHTML = rows.map(p=>{
+    const pct = personPct(p);
+    const filled = Object.values(p.mods||{}).filter(Boolean).length;
+    return `<tr>
+      <td><b>${esc(p.nome)}</b></td>
+      <td>${esc(p.regiao||"—")}</td>
+      <td>${pct}%</td>
+      <td style="font-size:11px;color:var(--muted)">${filled} status preenchidos</td>
+      <td>
+        <button class="btn btn-s" onclick="openTreinModal('${p.id}')">Editar</button>
+        <button class="btn btn-d" onclick="delTrein('${p.id}')">Excluir</button>
+      </td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Nenhum técnico</td></tr>`;
+}
+function openTreinModal(id){
+  const p = id ? DB.people.find(x=>x.id===id) : null;
+  const mods = p&&p.mods || {};
+  const opts = ["","Concluído On-line","Concluído Prático","Apto p/ Mód. Online","Apto p/ Mód. Prático","Inscrito (Online)","Inscrito (Prático)","Reprovado"];
+  let modHtml = MODULES_T.map(m=>`
+    <div class="fg"><label>${esc(m)}</label>
+      <select data-mod="${esc(m)}">
+        ${opts.map(o=>`<option ${mods[m]===o?"selected":""}>${o||"—"}</option>`).join("")}
+      </select>
+    </div>`).join("");
+  document.getElementById("modalBox").innerHTML = `
+    <h2>${p?"Editar":"Novo"} técnico</h2>
+    <div class="fg"><label>Nome</label><input id="m_tnome" value="${esc(p&&p.nome||"")}"></div>
+    <div class="fg"><label>Região</label><input id="m_treg" value="${esc(p&&p.regiao||"")}"></div>
+    <h3 style="font-size:13px;margin:12px 0 8px;color:var(--navy)">Status por módulo</h3>
+    ${modHtml}
+    <div class="modal-actions">
+      <button class="btn btn-s" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-g" onclick="saveTrein('${id||""}')">Salvar</button>
+    </div>`;
+  openModal();
+}
+function saveTrein(id){
+  const mods = {};
+  document.querySelectorAll("#modalBox select[data-mod]").forEach(s=>{
+    const v = s.value;
+    if(v && v!=="—") mods[s.getAttribute("data-mod")] = v;
+  });
+  const row = {
+    id: id||uid(),
+    nome: document.getElementById("m_tnome").value.trim(),
+    regiao: document.getElementById("m_treg").value.trim(),
+    mods
+  };
+  if(!row.nome){ alert("Nome obrigatório."); return; }
+  if(id){ const i=DB.people.findIndex(x=>x.id===id); if(i>=0) DB.people[i]=row; }
+  else DB.people.push(row);
+  saveDB(); closeModal(); renderTrein(); renderDash();
+}
+function delTrein(id){
+  if(!confirm("Excluir este técnico?")) return;
+  DB.people = DB.people.filter(x=>x.id!==id);
+  saveDB(); renderTrein(); renderDash();
+}
+
+/* ========== ASEC ========== */
+function renderAsec(){
+  const a = DB.asec||{};
+  document.getElementById("asecReal").value = a.realizadas||0;
+  document.getElementById("asecPlan").value = a.planejadas||0;
+  document.getElementById("asecNc").value = a.nc||0;
+  document.getElementById("asecSug").value = a.sugestoes||0;
+  const pct = a.planejadas ? Math.round(100*(a.realizadas||0)/a.planejadas) : 0;
+  document.getElementById("asecKpis").innerHTML = `
+    <div class="kpi"><div class="l">Realizadas</div><div class="v">${a.realizadas||0}</div><div class="s">YTD</div></div>
+    <div class="kpi"><div class="l">Planejadas</div><div class="v">${a.planejadas||0}</div><div class="s">YTD</div></div>
+    <div class="kpi"><div class="l">% Cumprimento</div><div class="v">${pct}%</div><div class="s">realizadas/planejadas</div></div>
+    <div class="kpi"><div class="l">NC</div><div class="v">${a.nc||0}</div><div class="s">acumulado</div></div>
+    <div class="kpi"><div class="l">Sugestões</div><div class="v">${a.sugestoes||0}</div><div class="s">melhoria</div></div>
+  `;
+}
+function saveAsecManual(){
+  DB.asec = {
+    realizadas: Number(document.getElementById("asecReal").value)||0,
+    planejadas: Number(document.getElementById("asecPlan").value)||0,
+    nc: Number(document.getElementById("asecNc").value)||0,
+    sugestoes: Number(document.getElementById("asecSug").value)||0
+  };
+  saveDB(); renderAsec(); renderDash();
+  alert("Indicadores ASEC salvos.");
+}
+
+/* ========== METROLOGIA ========== */
+function renderMetro(){
+  const q = (document.getElementById("metroSearch").value||"").toLowerCase();
+  const st = document.getElementById("metroStatus").value;
+  let rows = (DB.instruments||[]).map(enrichInst);
+  if(q) rows = rows.filter(i=> (i.equipamento+" "+(i.serie||"")).toLowerCase().includes(q));
+  if(st) rows = rows.filter(i=> i.status===st);
+  const all = (DB.instruments||[]).map(enrichInst);
+  document.getElementById("metroKpis").innerHTML = `
+    <div class="kpi"><div class="l">Instrumentos</div><div class="v">${all.length}</div><div class="s">cadastrados</div></div>
+    <div class="kpi"><div class="l">Vencidos</div><div class="v">${all.filter(i=>i.status==="Vencido").length}</div><div class="s">recalibrar</div></div>
+    <div class="kpi"><div class="l">30 dias</div><div class="v">${all.filter(i=>i.status==="Vence em 30 dias").length}</div><div class="s">urgência</div></div>
+    <div class="kpi"><div class="l">Em dia</div><div class="v">${all.filter(i=>i.status==="Em dia").length}</div><div class="s">ok</div></div>
+  `;
+  document.getElementById("metroBody").innerHTML = rows.map(i=>`
+    <tr>
+      <td><b>${esc(i.equipamento)}</b></td>
+      <td>${esc(i.serie||"—")}</td>
+      <td>${esc(i.tipo||"—")}</td>
+      <td>${esc(i.ultima||"—")}</td>
+      <td>${esc(i.proxima||"—")}</td>
+      <td><span class="badge ${badgeClass(i.status)}">${esc(i.status)}</span></td>
+      <td>
+        <button class="btn btn-s" onclick="openMetroModal('${i.id}')">Editar</button>
+        <button class="btn btn-d" onclick="delMetro('${i.id}')">Excluir</button>
+      </td>
+    </tr>`).join("") || `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted)">Nenhum instrumento</td></tr>`;
+}
+function openMetroModal(id){
+  const i = id ? DB.instruments.find(x=>x.id===id) : null;
+  document.getElementById("modalBox").innerHTML = `
+    <h2>${i?"Editar":"Novo"} instrumento</h2>
+    <div class="fg"><label>Equipamento</label><input id="m_eq" value="${esc(i&&i.equipamento||"")}"></div>
+    <div class="fg"><label>Tipo</label><input id="m_tipo_i" value="${esc(i&&i.tipo||"")}"></div>
+    <div class="fg"><label>Série / Código</label><input id="m_serie" value="${esc(i&&i.serie||"")}"></div>
+    <div class="fg"><label>Periodicidade (meses)</label><input type="number" id="m_per" value="${i&&i.periodicidade||12}" min="1"></div>
+    <div class="fg"><label>Data última calibração</label><input type="date" id="m_ult" value="${esc(i&&i.ultima||"")}"></div>
+    <div class="fg"><label>Situação</label><select id="m_sit_i">
+      ${["Ativo","Inativo","Em manutenção","Aguardando calibração"].map(t=>`<option ${i&&i.situacao===t?"selected":""}>${t}</option>`).join("")}
+    </select></div>
+    <div class="fg"><label>EMP (limite)</label><input id="m_emp" value="${esc(i&&i.emp||"")}"></div>
+    <div class="fg"><label>Prioridade</label><select id="m_prio">
+      ${["Alta","Média","Baixa"].map(t=>`<option ${i&&i.prioridade===t?"selected":""}>${t}</option>`).join("")}
+    </select></div>
+    <div class="modal-actions">
+      <button class="btn btn-s" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-g" onclick="saveMetro('${id||""}')">Salvar</button>
+    </div>`;
+  openModal();
+}
+function saveMetro(id){
+  const row = {
+    id: id||uid(),
+    equipamento: document.getElementById("m_eq").value.trim(),
+    tipo: document.getElementById("m_tipo_i").value.trim(),
+    serie: document.getElementById("m_serie").value.trim(),
+    periodicidade: Number(document.getElementById("m_per").value)||12,
+    ultima: document.getElementById("m_ult").value||null,
+    situacao: document.getElementById("m_sit_i").value,
+    emp: document.getElementById("m_emp").value.trim(),
+    prioridade: document.getElementById("m_prio").value
+  };
+  if(!row.equipamento){ alert("Equipamento obrigatório."); return; }
+  if(id){ const ix=DB.instruments.findIndex(x=>x.id===id); if(ix>=0) DB.instruments[ix]=row; }
+  else DB.instruments.push(row);
+  saveDB(); closeModal(); renderMetro(); renderDash();
+}
+function delMetro(id){
+  if(!confirm("Excluir este instrumento?")) return;
+  DB.instruments = DB.instruments.filter(x=>x.id!==id);
+  saveDB(); renderMetro(); renderDash();
+}
+
+/* ========== MODAL / UTILS ========== */
+function openModal(){ document.getElementById("modalBg").classList.add("on"); }
+function closeModal(){ document.getElementById("modalBg").classList.remove("on"); }
+document.getElementById("modalBg").addEventListener("click", e=>{ if(e.target.id==="modalBg") closeModal(); });
+function esc(s){
+  return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+}
+function renderAll(){
+  renderDash(); renderDocs(); renderFlux(); renderTrein(); renderAsec(); renderMetro();
+}
+
+function exportBackup(){
+  const blob = new Blob([JSON.stringify(DB,null,2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "sgq-carmak-backup-"+new Date().toISOString().slice(0,10)+".json";
+  a.click();
+}
+function resetAllData(){
+  if(!confirm("Apagar TODOS os dados locais deste SGQ?")) return;
+  localStorage.removeItem(LS);
+  seedMinimal(); saveDB(); renderAll();
+}
+
+/* Import Excel light — docs from sheet names if possible */
+document.getElementById("importXlsx").addEventListener("change", async e=>{
+  const f = e.target.files&&e.target.files[0];
+  e.target.value="";
+  if(!f||typeof XLSX==="undefined"){ document.getElementById("importStatus").textContent="Selecione um .xlsx (com internet na 1ª carga da lib)."; return; }
+  const st = document.getElementById("importStatus");
+  st.textContent = "Lendo…";
+  try{
+    const buf = await f.arrayBuffer();
+    const wb = XLSX.read(buf,{type:"array",cellDates:true});
+    let nDoc=0,nFlux=0,nP=0,nI=0;
+    // Lista mestra
+    const sn = wb.SheetNames.find(n=>/lista mestra|05 /i.test(n));
+    if(sn){
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:null});
+      let hi=-1;
+      for(let i=0;i<Math.min(20,rows.length);i++){
+        const c=(rows[i]||[]).map(x=>String(x||"").toLowerCase());
+        if(c.some(x=>x.includes("código")||x.includes("codigo"))&&c.some(x=>x.includes("título")||x.includes("titulo"))){hi=i;break;}
+      }
+      if(hi>=0){
+        const H=(rows[hi]||[]).map(x=>String(x||"").toLowerCase());
+        const col=lab=>H.findIndex(h=>h.includes(lab));
+        const iCod=col("cód")>=0?col("cód"):col("cod");
+        const iTit=col("tít")>=0?col("tít"):col("tit");
+        const iArea=col("área")>=0?col("área"):col("area");
+        const iTipo=col("tipo");
+        const iRev=H.findIndex(h=>h.includes("próx")||h.includes("prox")||h.includes("revis"));
+        const imported=[];
+        for(let r=hi+1;r<rows.length;r++){
+          const row=rows[r]; if(!row||!row[iCod]) continue;
+          imported.push({
+            id:uid(), codigo:String(row[iCod]), titulo:String(row[iTit]||""),
+            area:iArea>=0?String(row[iArea]||""):"", tipo:iTipo>=0?String(row[iTipo]||""):"",
+            revisao: null, situacao:"Ativo", criticidade:"Média"
+          });
+        }
+        if(imported.length){ DB.docs=imported; nDoc=imported.length; }
+      }
+    }
+    // Fluxogramas
+    const sf = wb.SheetNames.find(n=>/fluxograma|06 /i.test(n));
+    if(sf){
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sf],{header:1,defval:null});
+      let hi=-1;
+      for(let i=0;i<Math.min(15,rows.length);i++){
+        const c=(rows[i]||[]).map(x=>String(x||"").toLowerCase());
+        if(c.some(x=>x.includes("área")||x.includes("area"))&&c.some(x=>x.includes("processo")||x.includes("status"))){hi=i;break;}
+      }
+      if(hi>=0){
+        const H=(rows[hi]||[]).map(x=>String(x||"").toLowerCase());
+        const iA=H.findIndex(h=>h.includes("área")||h.includes("area"));
+        const iP=H.findIndex(h=>h.includes("processo"));
+        const iS=H.findIndex(h=>h.includes("status"));
+        const iO=H.findIndex(h=>h.includes("obs"));
+        const imported=[];
+        for(let r=hi+1;r<rows.length;r++){
+          const row=rows[r]; if(!row||!row[iA]) continue;
+          imported.push({id:uid(), area:String(row[iA]), processo:String(row[iP]||""), status:String(row[iS]||"Não Iniciado"), obs:iO>=0?String(row[iO]||""):""});
+        }
+        if(imported.length){ DB.fluxos=imported; nFlux=imported.length; }
+      }
+    }
+    // Treinamentos
+    const stn = wb.SheetNames.find(n=>/treinamento|01 /i.test(n)&&!/cronograma/i.test(n));
+    if(stn){
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[stn],{header:1,defval:null});
+      let hi=-1;
+      for(let i=0;i<Math.min(15,rows.length);i++){
+        const c=(rows[i]||[]).map(x=>String(x||"").toLowerCase());
+        if(c.some(x=>x==="nome")&&c.some(x=>x.includes("região")||x.includes("regiao"))){hi=i;break;}
+      }
+      if(hi>=0){
+        const H=rows[hi]||[];
+        const imported=[];
+        for(let r=hi+1;r<rows.length;r++){
+          const row=rows[r]; if(!row||!row[0]) continue;
+          const mods={};
+          MODULES_T.forEach((m,idx)=>{
+            const col=2+idx; // after Nome, Região roughly
+            if(row[col]) mods[m]=String(row[col]);
+          });
+          // better: match headers
+          H.forEach((h,ci)=>{
+            const hs=String(h||"");
+            if(MODULES_T.includes(hs) && row[ci]) mods[hs]=String(row[ci]);
+          });
+          imported.push({id:uid(), nome:String(row[0]), regiao:String(row[1]||""), mods});
+        }
+        if(imported.length){ DB.people=imported; nP=imported.length; }
+      }
+    }
+    // Metrologia
+    const sm = wb.SheetNames.find(n=>/instrumento|01 /i.test(n));
+    if(sm && /metrologia|calibra/i.test(f.name+wb.SheetNames.join(" "))){
+      /* skip if same file as KPI - user can import metrology file separately */
+    }
+    const sm2 = wb.SheetNames.find(n=>/instrumento/i.test(n));
+    if(sm2){
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sm2],{header:1,defval:null,raw:true});
+      let hi=-1;
+      for(let i=0;i<Math.min(15,rows.length);i++){
+        const c=(rows[i]||[]).map(x=>String(x||"").toLowerCase());
+        if(c.some(x=>x.includes("equipamento"))){hi=i;break;}
+      }
+      if(hi>=0){
+        const H=(rows[hi]||[]).map(x=>String(x||"").toLowerCase());
+        const col=lab=>H.findIndex(h=>h.includes(lab));
+        const iEq=col("equipamento"), iTipo=col("tipo"), iSerie=col("serie")>=0?col("serie"):col("código");
+        const iPer=col("periodicidade"), iUlt=col("ultima")>=0?col("ultima"):col("última");
+        const imported=[];
+        for(let r=hi+1;r<rows.length;r++){
+          const row=rows[r]; if(!row||!row[iEq]) continue;
+          let ultima=null;
+          if(iUlt>=0 && row[iUlt]){
+            if(row[iUlt] instanceof Date) ultima=row[iUlt].toISOString().slice(0,10);
+            else ultima=String(row[iUlt]).slice(0,10);
+          }
+          imported.push({
+            id:uid(), equipamento:String(row[iEq]), tipo:iTipo>=0?String(row[iTipo]||""):"",
+            serie:iSerie>=0?String(row[iSerie]||""):"", periodicidade:iPer>=0?Number(row[iPer])||12:12,
+            ultima, situacao:"Ativo", emp:"", prioridade:"Média"
+          });
+        }
+        if(imported.length>3){ DB.instruments=imported; nI=imported.length; }
+      }
+    }
+    saveDB(); renderAll();
+    st.textContent = `Importado · docs ${nDoc} · fluxos ${nFlux} · técnicos ${nP} · instrumentos ${nI}`;
+  }catch(err){
+    console.error(err);
+    st.textContent = "Erro: "+(err.message||err);
+  }
+});
+
+/* boot */
+if(sessionStorage.getItem("sgq_ok")==="1") enterApp();
+</script>
+</body>
+</html>
