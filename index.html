@@ -90,6 +90,15 @@ button,input,select,textarea{font-family:inherit}
 .guia-card .ic{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.28);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px;color:#fff;filter:grayscale(1) brightness(2.2);opacity:.92}
 .side button .ic-side{display:inline-block;width:1.2em;margin-right:8px;text-align:center;opacity:.7;filter:grayscale(1) brightness(1.85);font-size:14px}
 .side button.on .ic-side{filter:grayscale(1) brightness(0.35);opacity:.9}
+body.viewer-mode #btnNewDoc,
+body.viewer-mode #btnNewFlux,
+body.viewer-mode #btnNewTr,
+body.viewer-mode #btnNewMt,
+body.viewer-mode #btnNewDealer,
+body.viewer-mode .btn-d,
+body.viewer-mode [data-ed],
+body.viewer-mode [data-del]{display:none!important}
+.viewer-banner{background:#eef6ff;border:1px solid #b6d4fe;color:#0b3d91;padding:.55rem 1rem;border-radius:10px;margin-bottom:12px;font-size:.85rem;font-weight:600}
 .guia-card h3{font-family:Space Grotesk,sans-serif;font-size:18px;margin:0 0 6px}
 .guia-card p{font-size:13px;opacity:.78;line-height:1.45;margin:0}
 .guia-top{display:flex;justify-content:space-between;align-items:center;width:100%;max-width:1100px;margin-bottom:12px}
@@ -479,6 +488,7 @@ async function sbSignOut() {
   sessionStorage.removeItem('sgq_ok');
   sessionStorage.removeItem('sgq_email');
   sessionStorage.removeItem('sgq_access');
+  sessionStorage.removeItem('sgq_role');
 }
 
 function sbHeaders() {
@@ -581,6 +591,48 @@ async function pushFluxoToCloud(row) {
       await sbRest("POST", "fluxogramas", { body: payload });
     }
   } catch (e) { console.warn("pushFluxoToCloud", e); }
+}
+
+async function pushNcToCloud(row) {
+  if (!sessionStorage.getItem('sgq_access')) return;
+  try {
+    const mesIso = dealerMesToIso(row.mes);
+    const payload = {
+      unidade: row.unidade,
+      mes: mesIso,
+      nc: row.nc != null ? Number(row.nc) : 0,
+      sugestoes: row.sug != null ? Number(row.sug) : 0
+    };
+    let existing = null;
+    if (row.id && String(row.id).length > 8) {
+      existing = [{ id: row.id }];
+    } else {
+      existing = await sbRest('GET', 'asec_nc_mes', {
+        query: 'unidade=eq.' + encodeURIComponent(row.unidade) + '&mes=eq.' + encodeURIComponent(mesIso) + '&select=id'
+      });
+    }
+    if (existing && existing[0] && existing[0].id) {
+      await sbRest('PATCH', 'asec_nc_mes', { query: 'id=eq.' + existing[0].id, body: payload });
+      row.id = existing[0].id;
+    } else {
+      const ins = await sbRest('POST', 'asec_nc_mes', { body: payload });
+      if (ins && ins[0] && ins[0].id) row.id = ins[0].id;
+    }
+  } catch (e) { console.warn('pushNcToCloud', e); throw e; }
+}
+
+async function deleteNcFromCloud(id) {
+  if (!sessionStorage.getItem('sgq_access') || !id) return;
+  try {
+    await sbRest('DELETE', 'asec_nc_mes', { query: 'id=eq.' + encodeURIComponent(id) });
+  } catch (e) { console.warn('deleteNcFromCloud', e); throw e; }
+}
+
+function rebuildNcSplits() {
+  if (!DB.asec) DB.asec = {};
+  const all = DB.asec.nc_all || [];
+  DB.asec.nc_matriz = all.filter(x => /matriz/i.test(x.unidade || ''));
+  DB.asec.nc_itajai = all.filter(x => /itaj/i.test(x.unidade || ''));
 }
 
 async function pushDealerToCloud(row) {
@@ -772,8 +824,16 @@ async function pullAllFromCloud(){
     }catch(e){ console.warn('ASEC live merge', e); }
     if(nc && nc.length){
       if(!DB.asec) DB.asec={};
-      DB.asec.nc_matriz = nc.filter(x=>x.unidade==='Matriz').map(x=>({mes:x.mes,nc:x.nc,sug:x.sugestoes}));
-      DB.asec.nc_itajai = nc.filter(x=>x.unidade==='Itajai'||x.unidade==='Itajaí').map(x=>({mes:x.mes,nc:x.nc,sug:x.sugestoes}));
+      const mapNc = x=>({
+        id:x.id||null,
+        unidade:x.unidade,
+        mes:x.mes,
+        nc:x.nc!=null?Number(x.nc):0,
+        sug:x.sugestoes!=null?Number(x.sugestoes):(x.sug!=null?Number(x.sug):0)
+      });
+      DB.asec.nc_all = nc.map(mapNc);
+      DB.asec.nc_matriz = nc.filter(x=>/matriz/i.test(x.unidade||'')).map(mapNc);
+      DB.asec.nc_itajai = nc.filter(x=>/itaj/i.test(x.unidade||'')).map(mapNc);
     }
     if(dealer && dealer.length){
       if(!DB.asec) DB.asec={};
@@ -923,6 +983,50 @@ function saveDB(){
 
 
 /* AUTH */
+function isViewer(){
+  return (sessionStorage.getItem('sgq_role')||'') === 'viewer';
+}
+function canEdit(){
+  return !isViewer();
+}
+function applyRoleUI(){
+  document.body.classList.toggle('viewer-mode', isViewer());
+  const chip=document.getElementById('userChip');
+  if(chip){
+    const em=sessionStorage.getItem('sgq_email')||'';
+    chip.textContent = isViewer() ? 'Visualização' : (em.split('@')[0]||'Qualidade');
+  }
+}
+
+async function loadSgqProfile(userId, email){
+  try{
+    let rows=null;
+    if(userId){
+      rows = await sbRest('GET','profiles',{query:'id=eq.'+encodeURIComponent(userId)+'&select=id,email,role,full_name,area'});
+    }
+    if((!rows||!rows.length) && email){
+      rows = await sbRest('GET','profiles',{query:'email=eq.'+encodeURIComponent(email)+'&select=id,email,role,full_name,area'});
+    }
+    const p = rows && rows[0];
+    if(p && p.role){
+      const role = String(p.role).toLowerCase();
+      if(role==='viewer' || role==='visualizador') return 'viewer';
+      if(role==='master' || role==='admin' || role==='qualidade') return 'master';
+      return role;
+    }
+  }catch(e){ console.warn('loadSgqProfile', e); }
+  /* fallback: e-mails conhecidos de visualização compartilhada */
+  const em = String(email||'').toLowerCase();
+  if(
+    em === 'colab@carmak.com.br' ||
+    em.indexOf('colab@')>=0 ||
+    em.indexOf('visualiz')>=0 ||
+    em.indexOf('viewer')>=0 ||
+    em.indexOf('leitura')>=0
+  ) return 'viewer';
+  return 'master';
+}
+
 async function doLogin(){
   const u=(document.getElementById('loginUser').value||'').trim();
   const p=document.getElementById('loginPass').value||'';
@@ -943,6 +1047,9 @@ async function doLogin(){
     sessionStorage.setItem('sgq_ok','1');
     sessionStorage.setItem('sgq_email', (user && user.email) || u);
     sessionStorage.setItem('sgq_access', access);
+    const role = await loadSgqProfile(user && user.id, (user && user.email) || u);
+    sessionStorage.setItem('sgq_role', role);
+    applyRoleUI();
     err.textContent='Sincronizando dados…';
     err.classList.add('show','loading');
     loadDB();
@@ -964,6 +1071,8 @@ async function doLogin(){
 
 function doLogout(){
   sbSignOut();
+  sessionStorage.removeItem('sgq_role');
+  document.body.classList.remove('viewer-mode');
   document.getElementById('app').classList.remove('on');
   document.getElementById('guia').classList.remove('on');
   document.getElementById('login').classList.remove('hidden');
@@ -996,7 +1105,7 @@ const THEMES=[
 function openSettings(){
   const email=sessionStorage.getItem('sgq_email')||'—';
   const el=document.getElementById('acctEmail');
-  if(el) el.textContent=email;
+  if(el) el.textContent=email + (isViewer()?' · visualização':'');
   paintAvatar();
   const grid=document.getElementById('themeGrid');
   if(grid){
@@ -1010,6 +1119,11 @@ function openSettings(){
       grid.querySelectorAll('.theme-opt').forEach(x=>x.classList.toggle('active',x===b));
     });
   }
+  /* visualizador: não altera senha da conta compartilhada (só a Qualidade controla) */
+  document.querySelectorAll('#settingsPanel .sp-sec').forEach(sec=>{
+    const lab=sec.querySelector('.sp-lab');
+    if(lab && /senha/i.test(lab.textContent||'')) sec.style.display = isViewer()?'none':'';
+  });
   document.getElementById('settingsPanel').classList.add('on');
   document.getElementById('settingsScrim').classList.add('on');
 }
@@ -1142,6 +1256,7 @@ const HUBS={
   asec:{label:'ASEC Toyota', icon:'☑', items:[
     {id:'asec-dash',label:'Dashboard',icon:'▣'},
     {id:'asec-checklist',label:'Checklist / Relatório',icon:'☑'},
+    {id:'asec-nc',label:'NC × Sugestões',icon:'▤'},
     {id:'asec-dealer',label:'Dealer Evaluation',icon:'◇'}
   ]},
   metro:{label:'Metrologia', icon:'⌖', items:[
@@ -1150,13 +1265,19 @@ const HUBS={
   ]}
 };
 
+function hubItems(h){
+  const all=(HUBS[h]&&HUBS[h].items)||[];
+  if(isViewer()) return all.filter(it=>/-dash$/.test(it.id));
+  return all;
+}
 function enterHub(h){
   hub=h;
   document.getElementById('guia').classList.remove('on');
   document.getElementById('app').classList.add('on');
-  document.getElementById('hubTitle').innerHTML=HUBS[h].label+'<small>Dashboard</small>';
+  applyRoleUI();
+  document.getElementById('hubTitle').innerHTML=HUBS[h].label+'<small>'+(isViewer()?'Somente leitura':'Dashboard')+'</small>';
   document.getElementById('sideHubLabel').textContent=HUBS[h].label;
-  const items=HUBS[h].items;
+  const items=hubItems(h);
   document.getElementById('sideItems').innerHTML=items.map(it=>
     `<button type="button" data-v="${it.id}"><span class="ic-side" aria-hidden="true">${it.icon||'·'}</span>${it.label}</button>`
   ).join('');
@@ -1194,20 +1315,25 @@ function bindAreaChartClicks(){
 }
 
 function showView(v){
+  if(isViewer() && v && !/-dash$/.test(v)){
+    const map={ 'sgq-docs':'sgq-dash','sgq-flux':'sgq-dash','trein-lista':'trein-dash','asec-checklist':'asec-dash','asec-dealer':'asec-dash','asec-nc':'asec-dash','metro-lista':'metro-dash' };
+    v = map[v] || (hub ? hub+'-dash' : 'sgq-dash');
+  }
   view=v;
   document.querySelectorAll('#sideItems button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   const main=document.getElementById('main');
-  if(v==='sgq-dash') main.innerHTML=renderSgqDash();
-  else if(v==='sgq-docs'){ main.innerHTML=renderDocsShell(); bindDocs(); }
-  else if(v==='sgq-flux'){ main.innerHTML=renderFluxShell(); bindFlux(); }
-  else if(v==='trein-dash') main.innerHTML=renderTreinDash();
-  else if(v==='trein-lista'){ main.innerHTML=renderTreinShell(); bindTrein(); }
+  const ban = isViewer() ? `<div class="viewer-banner">Modo visualização — somente dashboards. Sem permissão de edição.</div>` : '';
+  if(v==='sgq-dash') main.innerHTML=ban+renderSgqDash();
+  else if(v==='sgq-docs'){ if(!canEdit()){ showView('sgq-dash'); return; } main.innerHTML=renderDocsShell(); bindDocs(); }
+  else if(v==='sgq-flux'){ if(!canEdit()){ showView('sgq-dash'); return; } main.innerHTML=renderFluxShell(); bindFlux(); }
+  else if(v==='trein-dash') main.innerHTML=ban+renderTreinDash();
+  else if(v==='trein-lista'){ if(!canEdit()){ showView('trein-dash'); return; } main.innerHTML=renderTreinShell(); bindTrein(); }
   else if(v==='asec-dash'){
-    main.innerHTML=renderAsecDash();
+    main.innerHTML=ban+renderAsecDash();
     const btn=document.getElementById('btnAsecRefresh');
     if(btn) btn.onclick=async()=>{
       btn.disabled=true; btn.textContent='Atualizando…';
-      try{ await pullAllFromCloud(); main.innerHTML=renderAsecDash();
+      try{ await pullAllFromCloud(); main.innerHTML=ban+renderAsecDash();
         const b2=document.getElementById('btnAsecRefresh');
         if(b2) b2.onclick=btn.onclick;
       }catch(e){ alert('Falha ao atualizar: '+(e.message||e)); }
@@ -1215,6 +1341,7 @@ function showView(v){
     };
   }
   else if(v==='asec-checklist'){
+    if(!canEdit()){ showView('asec-dash'); return; }
     main.innerHTML=`<div class="page-h"><h1>Checklist ASEC Toyota</h1>
       <p>Abre o sistema de auditoria interna (mesmo login Supabase). Relatórios salvos e o cronograma alimentam automaticamente o gráfico de realizadas × planejadas neste dashboard.</p></div>
       <div class="panel" style="text-align:center;padding:2rem">
@@ -1223,9 +1350,10 @@ function showView(v){
         <p style="margin-top:1rem;font-size:12px;color:var(--muted)">Dica: deixe as duas abas abertas. Ao salvar um relatório ou incluir data no cronograma, volte aqui e recarregue o Dashboard ASEC (ou faça logout/login) para atualizar os números.</p>
       </div>`;
   }
-  else if(v==='asec-dealer'){ main.innerHTML=renderDealerShell(); bindDealer(); }
-  else if(v==='metro-dash') main.innerHTML=renderMetroDash();
-  else if(v==='metro-lista'){ main.innerHTML=renderMetroShell(); bindMetro(); }
+  else if(v==='asec-nc'){ if(!canEdit()){ showView('asec-dash'); return; } main.innerHTML=renderNcShell(); bindNc(); }
+  else if(v==='asec-dealer'){ if(!canEdit()){ showView('asec-dash'); return; } main.innerHTML=renderDealerShell(); bindDealer(); }
+  else if(v==='metro-dash') main.innerHTML=ban+renderMetroDash();
+  else if(v==='metro-lista'){ if(!canEdit()){ showView('metro-dash'); return; } main.innerHTML=renderMetroShell(); bindMetro(); }
 
   if(v==='sgq-dash') setTimeout(bindAreaChartClicks,30);
 }
@@ -2496,6 +2624,155 @@ function openMetroModal(id){
 }
 
 
+/* ===== NC × SUGESTÕES CRUD ===== */
+const NC_UNIDADES = ['Matriz', 'Itajaí'];
+
+function renderNcShell(){
+  return `<div class="page-h"><h1>NC × Sugestões</h1>
+    <p>Cadastre quantidade de não conformidades e sugestões de melhoria por unidade e mês. Os gráficos do Dashboard ASEC usam estes dados.</p></div>
+  <div class="toolbar">
+    <div class="fg"><label>Unidade</label>
+      <select id="ncFilter"><option value="">Todas</option>${NC_UNIDADES.map(n=>`<option>${esc(n)}</option>`).join('')}</select>
+    </div>
+    <div class="fg"><label>Mês</label>
+      <select id="ncMesF"><option value="">Todos</option>${['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'].map(m=>`<option>${m}</option>`).join('')}</select>
+    </div>
+    <button type="button" class="btn btn-g" id="btnNewNc">+ Novo registro</button>
+  </div>
+  <div class="table-wrap"><table><thead><tr>
+    <th>Unidade</th><th>Mês</th><th>Não conformidades</th><th>Sugestões</th><th></th>
+  </tr></thead><tbody id="ncBody"></tbody></table></div>`;
+}
+
+function bindNc(){
+  const MES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  function labelMes(m){
+    const s=String(m||'');
+    if(MES_PT.includes(s)) return s;
+    const mm=s.match(/^(\d{4})-(\d{2})/);
+    if(mm){ const mo=parseInt(mm[2],10); return MES_PT[mo-1]||s; }
+    return s;
+  }
+  function paint(){
+    if(!DB.asec) DB.asec={};
+    if(!Array.isArray(DB.asec.nc_all)){
+      const m=(DB.asec.nc_matriz||[]).map(x=>({...x,unidade:x.unidade||'Matriz'}));
+      const i=(DB.asec.nc_itajai||[]).map(x=>({...x,unidade:x.unidade||'Itajaí'}));
+      DB.asec.nc_all = m.concat(i);
+    }
+    const fu=(document.getElementById('ncFilter').value||'');
+    const fm=(document.getElementById('ncMesF').value||'');
+    let rows=DB.asec.nc_all.slice().sort((a,b)=>String(b.mes).localeCompare(String(a.mes))||String(a.unidade).localeCompare(String(b.unidade)));
+    if(fu) rows=rows.filter(r=>r.unidade===fu || (fu==='Itajaí' && /itaj/i.test(r.unidade||'')));
+    if(fm) rows=rows.filter(r=>labelMes(r.mes)===fm);
+    document.getElementById('ncBody').innerHTML=rows.map((r,idx)=>{
+      const key=r.id||(r.unidade+'|'+r.mes+'|'+idx);
+      return `<tr>
+        <td><b>${esc(r.unidade)}</b></td>
+        <td>${esc(labelMes(r.mes))}</td>
+        <td>${r.nc!=null?r.nc:'—'}</td>
+        <td>${r.sug!=null?r.sug:'—'}</td>
+        <td>
+          <button class="btn btn-s" data-ed="${esc(key)}">Editar</button>
+          <button class="btn btn-d" data-del="${esc(key)}">Excluir</button>
+        </td></tr>`;
+    }).join('')||`<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Nenhum registro — clique em + Novo registro</td></tr>`;
+    document.querySelectorAll('#ncBody [data-ed]').forEach(b=>{
+      b.onclick=()=>{
+        const key=b.getAttribute('data-ed');
+        const row=DB.asec.nc_all.find((r,i)=>(r.id||(r.unidade+'|'+r.mes+'|'+i))===key);
+        openNcModal(row);
+      };
+    });
+    document.querySelectorAll('#ncBody [data-del]').forEach(b=>{
+      b.onclick=async()=>{
+        if(!confirm('Excluir este registro?')) return;
+        const key=b.getAttribute('data-del');
+        const ix=DB.asec.nc_all.findIndex((r,i)=>(r.id||(r.unidade+'|'+r.mes+'|'+i))===key);
+        if(ix<0) return;
+        const row=DB.asec.nc_all[ix];
+        try{
+          if(row.id) await deleteNcFromCloud(row.id);
+          DB.asec.nc_all.splice(ix,1);
+          rebuildNcSplits();
+          saveDB();
+          paint();
+        }catch(e){ alert('Erro ao excluir: '+(e.message||e)); }
+      };
+    });
+  }
+  document.getElementById('ncFilter').onchange=paint;
+  document.getElementById('ncMesF').onchange=paint;
+  document.getElementById('btnNewNc').onclick=()=>openNcModal(null);
+  paint();
+}
+
+function openNcModal(row){
+  const MES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  function labelMes(m){
+    const s=String(m||'');
+    if(MES_PT.includes(s)) return s;
+    const mm=s.match(/^(\d{4})-(\d{2})/);
+    if(mm) return MES_PT[parseInt(mm[2],10)-1]||s;
+    return s;
+  }
+  const curMes=row?labelMes(row.mes):MES_PT[new Date().getMonth()];
+  let uni=row&&row.unidade?row.unidade:'Matriz';
+  if(/itaj/i.test(uni)) uni='Itajaí';
+  else if(/matriz/i.test(uni)) uni='Matriz';
+  document.getElementById('modalBox').innerHTML=`
+    <div class="modal-head"><h2>${row?'Editar':'Novo'} NC × Sugestões</h2></div>
+    <div class="modal-body">
+      <div class="fg"><label>Unidade *</label>
+        <select id="nc_uni">${NC_UNIDADES.map(n=>`<option ${n===uni?'selected':''}>${n}</option>`).join('')}</select>
+      </div>
+      <div class="fg"><label>Mês *</label>
+        <select id="nc_mes">${MES_PT.map(m=>`<option ${m===curMes?'selected':''}>${m}</option>`).join('')}</select>
+      </div>
+      <div class="grid2" style="gap:10px">
+        <div class="fg"><label>Não conformidades *</label><input type="number" id="nc_nc" min="0" step="1" value="${row&&row.nc!=null?row.nc:''}" placeholder="ex.: 6"></div>
+        <div class="fg"><label>Sugestões de melhoria *</label><input type="number" id="nc_sug" min="0" step="1" value="${row&&row.sug!=null?row.sug:''}" placeholder="ex.: 10"></div>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-top:8px">Os totais e gráficos do Dashboard ASEC atualizam após salvar e sincronizar.</p>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-s" id="nc_cancel">Cancelar</button>
+      <button type="button" class="btn btn-g" id="nc_save">Salvar</button>
+    </div>`;
+  openModal();
+  document.getElementById('nc_cancel').onclick=()=>closeModal();
+  document.getElementById('nc_save').onclick=async function(){
+    try{
+      const unidade=document.getElementById('nc_uni').value;
+      const mes=document.getElementById('nc_mes').value;
+      const ncRaw=document.getElementById('nc_nc').value;
+      const sugRaw=document.getElementById('nc_sug').value;
+      if(ncRaw===''||ncRaw==null){ alert('Informe a quantidade de NC'); return; }
+      if(sugRaw===''||sugRaw==null){ alert('Informe a quantidade de sugestões'); return; }
+      const nc=Number(ncRaw), sug=Number(sugRaw);
+      if(isNaN(nc)||nc<0||isNaN(sug)||sug<0){ alert('Valores inválidos'); return; }
+      if(!DB.asec) DB.asec={};
+      if(!Array.isArray(DB.asec.nc_all)) DB.asec.nc_all=[];
+      const payload={ id: row&&row.id?row.id:null, unidade, mes, nc, sug };
+      await pushNcToCloud(payload);
+      if(row){
+        const ix=DB.asec.nc_all.indexOf(row);
+        if(ix>=0) DB.asec.nc_all[ix]=Object.assign({}, row, payload);
+        else DB.asec.nc_all.push(payload);
+      } else {
+        DB.asec.nc_all.push(payload);
+      }
+      rebuildNcSplits();
+      saveDB();
+      closeModal();
+      showView('asec-nc');
+    }catch(err){
+      console.error(err);
+      alert('Erro ao salvar: '+(err.message||err));
+    }
+  };
+}
+
 /* ===== DEALER EVALUATION CRUD ===== */
 const DEALER_NAMES = [
   'Carmak - São Leopoldo RS',
@@ -2667,6 +2944,7 @@ document.getElementById('modalBg').addEventListener('click',e=>{if(e.target.id==
 if(sessionStorage.getItem('sgq_ok')==='1'){
   document.getElementById('login').classList.add('hidden');
   document.getElementById('guia').classList.add('on');
+  applyRoleUI();
   loadDB();
   if(sessionStorage.getItem('sgq_access')){
     pullAllFromCloud().then(ok=>{
