@@ -2410,6 +2410,8 @@ function renderAsecDash(){
   let ncTot=0,sugTot=0;
   [...ncMatRows,...ncItaRows].forEach(r=>{ncTot+=r.a;sugTot+=r.b});
 
+  const SETOR_LABEL={GP:'Gente & Performance',RH:'Gente & Performance','Recursos Humanos':'Gente & Performance'};
+  function setorLabel(s){ return SETOR_LABEL[s]||s; }
   const setores=[...new Set(assertv.map(x=>x.setor).filter(Boolean))];
   const setorColors=themeAssertColors();
 
@@ -2458,7 +2460,7 @@ function renderAsecDash(){
   function assertChart(unidadePred){
     return lineChartMulti(
       setores.map((s,i)=>({
-        name:s,
+        name:setorLabel(s),
         color:setorColors[i%setorColors.length],
         values:MES_ORDER.map(mes=>{
           const r=assertv.find(x=>unidadePred(x.unidade) && x.setor===s && mesKey(x.mes)===mes);
