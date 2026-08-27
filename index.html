@@ -141,7 +141,16 @@ tr:hover td{background:var(--tint)}
 .badge.off{background:#E0E0E0;color:#555}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:center;justify-content:center;padding:1rem}
 .modal-bg.on{display:flex}
-.modal{background:var(--card);border-radius:16px;max-width:540px;width:100%;max-height:90vh;overflow:auto;padding:1.2rem 1.35rem;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.modal{background:var(--card);border-radius:16px;max-width:640px;width:100%;max-height:92vh;overflow:hidden;padding:0;box-shadow:0 20px 50px rgba(0,0,0,.3);display:flex;flex-direction:column}
+.modal-head{padding:1.1rem 1.25rem 0.5rem;flex-shrink:0}
+.modal-head h2{margin:0}
+.modal-body{padding:0.5rem 1.25rem 1rem;overflow:auto;flex:1}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;padding:0.85rem 1.25rem;border-top:1px solid var(--line);background:var(--card);flex-shrink:0;position:sticky;bottom:0}
+.modal .fg{margin-bottom:10px}
+.modal .fg label{display:block;font-size:10px;text-transform:uppercase;font-weight:700;color:var(--muted);margin-bottom:4px}
+.modal input,.modal select,.modal textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff}
+.modal textarea{min-height:64px;resize:vertical}
+
 .modal h2{font-family:Space Grotesk,sans-serif;font-size:17px;margin-bottom:12px;color:var(--navy)}
 .modal .fg{margin-bottom:10px}
 .modal input,.modal select,.modal textarea{width:100%}
@@ -261,7 +270,7 @@ tr:hover td{background:var(--tint)}
 
 <script>
 const AUTH_USER='qualidade', AUTH_PASS='Carmak@SGQ2026';
-const LS='carmak_sgq_v4';
+const LS='carmak_sgq_v5';
 const FREQ_BY_CRIT={Alta:12,Média:24,Media:24,Baixa:36};
 const MODULES_T=["STEP 1 TO/BT Módulo 1", "STEP 1 TO/BT Módulo 2", "STEP 1 TO/BT Módulo 3", "STEP 2 TO Módulo 1", "STEP 2 TO Módulo 2", "STEP 2 TO Módulo 3", "STEP 3 TO Módulo 1", "STEP 3 TO Módulo 2", "STEP 3 TO Módulo 3", "STEP 1 BT", "STEP 2 BT"];
 
@@ -365,7 +374,16 @@ function loadDB(){
     }
   }
 }
-function saveDB(){ localStorage.setItem(LS, JSON.stringify(DB)); }
+function saveDB(){
+  try{
+    localStorage.setItem(LS, JSON.stringify(DB));
+    return true;
+  }catch(e){
+    console.error('saveDB', e);
+    alert('Nao foi possivel salvar no navegador. ' + (e && e.message ? e.message : String(e)) + ' Limpe Local Storage (F12 > Application) se o erro persistir.');
+    return false;
+  }
+}
 
 /* AUTH */
 function doLogin(){
@@ -542,70 +560,83 @@ function openDocModal(id){
   const prios=['Urgente','Alta','Média','Baixa'];
   const sits=['Ativo','Obsoleto','Cancelado'];
   const controles=['Digital','Físico','Digital e Físico'];
-  document.getElementById('modalBox').innerHTML=`<h2>${d?'Editar':'Novo'} documento</h2>
-    <div class="grid2" style="gap:10px">
-    <div class="fg"><label>Código *</label><input id="m_cod" value="${esc(d&&d.codigo||'')}"></div>
-    <div class="fg"><label>Tipo</label><select id="m_tipo">${tipos.map(t=>`<option ${d&&d.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div>
+  const sel=(list,cur)=>list.map(t=>`<option value="${esc(t)}" ${cur===t?'selected':''}>${esc(t)}</option>`).join('');
+  document.getElementById('modalBox').innerHTML=`
+    <div class="modal-head"><h2>${d?'Editar':'Novo'} documento</h2></div>
+    <div class="modal-body">
+      <div class="grid2" style="gap:10px">
+        <div class="fg"><label>Código *</label><input id="m_cod" value="${esc(d&&d.codigo||'')}"></div>
+        <div class="fg"><label>Tipo</label><select id="m_tipo">${sel(tipos,d&&d.tipo)}</select></div>
+      </div>
+      <div class="fg"><label>Título do documento *</label><input id="m_tit" value="${esc(d&&d.titulo||'')}"></div>
+      <div class="grid2" style="gap:10px">
+        <div class="fg"><label>Área</label><input id="m_area" value="${esc(d&&d.area||'')}"></div>
+        <div class="fg"><label>Responsável técnico</label><input id="m_resp" value="${esc(d&&d.responsavel||'')}"></div>
+      </div>
+      <div class="grid2" style="gap:10px">
+        <div class="fg"><label>Gestor aprovador</label><input id="m_gestor" value="${esc(d&&d.gestor||'')}"></div>
+        <div class="fg"><label>Controle documental</label><select id="m_ctrl">${sel(controles,d&&d.controle)}${d&&d.controle&&!controles.includes(d.controle)?`<option selected value="${esc(d.controle)}">${esc(d.controle)}</option>`:''}</select></div>
+      </div>
+      <div class="grid2" style="gap:10px">
+        <div class="fg"><label>Revisão atual</label><input id="m_revat" value="${esc(d&&d.revisao_atual||'')}" placeholder="ex.: 1"></div>
+        <div class="fg"><label>Data de emissão</label><input type="date" id="m_emi" value="${esc(d&&d.emissao||'')}"></div>
+      </div>
+      <div class="grid2" style="gap:10px">
+        <div class="fg"><label>Data da última revisão</label><input type="date" id="m_ult" value="${esc(d&&d.ultima||'')}"></div>
+        <div class="fg"><label>Próxima revisão</label><input type="date" id="m_rev" value="${esc(d&&d.revisao||'')}"></div>
+      </div>
+      <div class="grid2" style="gap:10px">
+        <div class="fg"><label>Criticidade</label><select id="m_crit">${sel(crits,d&&d.criticidade||'Média')}</select></div>
+        <div class="fg"><label>Frequência (meses)</label><input type="number" id="m_freq" min="1" value="${d&&d.frequencia!=null?d.frequencia:''}" placeholder="auto pela criticidade"></div>
+      </div>
+      <div class="grid2" style="gap:10px">
+        <div class="fg"><label>Prioridade (revisão)</label><select id="m_prio"><option value="">—</option>${sel(prios,d&&d.prioridade)}</select></div>
+        <div class="fg"><label>Situação</label><select id="m_sit">${sel(sits,d&&d.situacao||'Ativo')}</select></div>
+      </div>
+      <div class="fg"><label>Norma relacionada</label><input id="m_norma" value="${esc(d&&d.norma||'')}"></div>
+      <div class="fg"><label>Observações</label><textarea id="m_obs">${esc(d&&d.obs||'')}</textarea></div>
     </div>
-    <div class="fg"><label>Título do documento *</label><input id="m_tit" value="${esc(d&&d.titulo||'')}"></div>
-    <div class="grid2" style="gap:10px">
-    <div class="fg"><label>Área</label><input id="m_area" value="${esc(d&&d.area||'')}"></div>
-    <div class="fg"><label>Responsável técnico</label><input id="m_resp" value="${esc(d&&d.responsavel||'')}"></div>
-    </div>
-    <div class="grid2" style="gap:10px">
-    <div class="fg"><label>Gestor aprovador</label><input id="m_gestor" value="${esc(d&&d.gestor||'')}"></div>
-    <div class="fg"><label>Controle documental</label><select id="m_ctrl">${controles.map(t=>`<option ${d&&d.controle===t?'selected':''}>${t}</option>`).join('')}<option ${d&&d.controle&&!controles.includes(d.controle)?'selected':''}>${esc(d&&d.controle||'')}</option></select></div>
-    </div>
-    <div class="grid2" style="gap:10px">
-    <div class="fg"><label>Revisão atual</label><input id="m_revat" value="${esc(d&&d.revisao_atual||'')}" placeholder="ex.: 1"></div>
-    <div class="fg"><label>Data de emissão</label><input type="date" id="m_emi" value="${esc(d&&d.emissao||'')}"></div>
-    </div>
-    <div class="grid2" style="gap:10px">
-    <div class="fg"><label>Data da última revisão</label><input type="date" id="m_ult" value="${esc(d&&d.ultima||'')}"></div>
-    <div class="fg"><label>Próxima revisão</label><input type="date" id="m_rev" value="${esc(d&&d.revisao||'')}"></div>
-    </div>
-    <div class="grid2" style="gap:10px">
-    <div class="fg"><label>Criticidade</label><select id="m_crit">${crits.map(t=>`<option ${d&&d.criticidade===t?'selected':''}>${t}</option>`).join('')}</select></div>
-    <div class="fg"><label>Frequência (meses)</label><input type="number" id="m_freq" min="1" value="${d&&d.frequencia!=null?d.frequencia:''}" placeholder="auto pela criticidade"></div>
-    </div>
-    <div class="grid2" style="gap:10px">
-    <div class="fg"><label>Prioridade (revisão)</label><select id="m_prio"><option value="">—</option>${prios.map(t=>`<option ${d&&d.prioridade===t?'selected':''}>${t}</option>`).join('')}</select></div>
-    <div class="fg"><label>Situação</label><select id="m_sit">${sits.map(t=>`<option ${d&&d.situacao===t?'selected':''}>${t}</option>`).join('')}</select></div>
-    </div>
-    <div class="fg"><label>Norma relacionada</label><input id="m_norma" value="${esc(d&&d.norma||'')}"></div>
-    <div class="fg"><label>Observações</label><textarea id="m_obs">${esc(d&&d.obs||'')}</textarea></div>
-    <div class="modal-actions"><button class="btn btn-s" onclick="closeModal()">Cancelar</button>
-    <button class="btn btn-g" id="m_save">Salvar</button></div>`;
+    <div class="modal-actions">
+      <button type="button" class="btn btn-s" id="m_cancel">Cancelar</button>
+      <button type="button" class="btn btn-g" id="m_save">Salvar</button>
+    </div>`;
   openModal();
-  document.getElementById('m_save').onclick=()=>{
-    const crit=document.getElementById('m_crit').value;
-    let freq=document.getElementById('m_freq').value;
-    freq=freq!==''?Number(freq):critFreq(crit);
-    let ultima=document.getElementById('m_ult').value||null;
-    let revisao=document.getElementById('m_rev').value||null;
-    if(!revisao&&ultima)revisao=addMonths(ultima,freq);
-    const row={
-      id:id||uid(),
-      codigo:document.getElementById('m_cod').value.trim(),
-      tipo:document.getElementById('m_tipo').value,
-      titulo:document.getElementById('m_tit').value.trim(),
-      area:document.getElementById('m_area').value.trim(),
-      responsavel:document.getElementById('m_resp').value.trim(),
-      gestor:document.getElementById('m_gestor').value.trim(),
-      controle:document.getElementById('m_ctrl').value.trim(),
-      revisao_atual:document.getElementById('m_revat').value.trim(),
-      emissao:document.getElementById('m_emi').value||null,
-      ultima, revisao, criticidade:crit, frequencia:freq,
-      prioridade:document.getElementById('m_prio').value,
-      norma:document.getElementById('m_norma').value.trim(),
-      situacao:document.getElementById('m_sit').value,
-      obs:document.getElementById('m_obs').value.trim()
-    };
-    if(!row.codigo||!row.titulo){alert('Código e título obrigatórios');return}
-    if(id){const i=DB.docs.findIndex(x=>x.id===id);if(i>=0)DB.docs[i]=Object.assign({},DB.docs[i],row)}else DB.docs.push(row);
-    saveDB();closeModal();showView('sgq-docs');
+  document.getElementById('m_cancel').onclick=()=>closeModal();
+  document.getElementById('m_save').onclick=function(ev){
+    ev.preventDefault();
+    try{
+      const codigo=(document.getElementById('m_cod').value||'').trim();
+      const titulo=(document.getElementById('m_tit').value||'').trim();
+      if(!codigo||!titulo){alert('Código e título obrigatórios');return}
+      const crit=document.getElementById('m_crit').value;
+      let freq=document.getElementById('m_freq').value;
+      freq=freq!==''?Number(freq):critFreq(crit);
+      let ultima=document.getElementById('m_ult').value||null;
+      let revisao=document.getElementById('m_rev').value||null;
+      if(!revisao&&ultima) revisao=addMonths(ultima,freq);
+      const row={
+        id:id||uid(), codigo, titulo, tipo:document.getElementById('m_tipo').value,
+        area:(document.getElementById('m_area').value||'').trim(),
+        responsavel:(document.getElementById('m_resp').value||'').trim(),
+        gestor:(document.getElementById('m_gestor').value||'').trim(),
+        controle:document.getElementById('m_ctrl').value,
+        revisao_atual:(document.getElementById('m_revat').value||'').trim(),
+        emissao:document.getElementById('m_emi').value||null,
+        ultima, revisao, criticidade:crit, frequencia:freq,
+        prioridade:document.getElementById('m_prio').value,
+        norma:(document.getElementById('m_norma').value||'').trim(),
+        situacao:document.getElementById('m_sit').value,
+        obs:(document.getElementById('m_obs').value||'').trim()
+      };
+      if(!Array.isArray(DB.docs)) DB.docs=[];
+      if(id){const i=DB.docs.findIndex(x=>x.id===id);if(i>=0)DB.docs[i]=Object.assign({},DB.docs[i],row);else DB.docs.push(row)}
+      else DB.docs.push(row);
+      if(!saveDB()) return;
+      closeModal(); showView('sgq-docs');
+    }catch(err){console.error(err);alert('Erro ao salvar: '+(err.message||err))}
   };
 }
+
 
 /* ===== FLUX ===== */
 function renderFluxShell(){
@@ -642,22 +673,37 @@ function bindFlux(){
 }
 function openFluxModal(id){
   const f=id?DB.fluxos.find(x=>x.id===id):null;
-  document.getElementById('modalBox').innerHTML=`<h2>${f?'Editar':'Novo'} fluxograma</h2>
-    <div class="fg"><label>Área</label><input id="m_fa" value="${esc(f&&f.area||'')}"></div>
-    <div class="fg"><label>Processo</label><input id="m_fp" value="${esc(f&&f.processo||'')}"></div>
-    <div class="fg"><label>Status</label><select id="m_fs">${['Finalizado','Em Andamento','Aguardando Revisão','Não Iniciado'].map(t=>`<option ${f&&f.status===t?'selected':''}>${t}</option>`).join('')}</select></div>
-    <div class="fg"><label>Observações</label><textarea id="m_fo">${esc(f&&f.obs||'')}</textarea></div>
-    <div class="modal-actions"><button class="btn btn-s" onclick="closeModal()">Cancelar</button>
-    <button class="btn btn-g" id="m_save">Salvar</button></div>`;
+  const sts=['Finalizado','Em Andamento','Aguardando Revisão','Não Iniciado'];
+  document.getElementById('modalBox').innerHTML=`
+    <div class="modal-head"><h2>${f?'Editar':'Novo'} fluxograma</h2></div>
+    <div class="modal-body">
+      <div class="fg"><label>Área *</label><input id="m_fa" value="${esc(f&&f.area||'')}"></div>
+      <div class="fg"><label>Processo *</label><input id="m_fp" value="${esc(f&&f.processo||'')}"></div>
+      <div class="fg"><label>Status</label><select id="m_fs">${sts.map(t=>`<option ${f&&f.status===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div class="fg"><label>Observações</label><textarea id="m_fo">${esc(f&&f.obs||'')}</textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-s" id="m_cancel">Cancelar</button>
+      <button type="button" class="btn btn-g" id="m_save">Salvar</button>
+    </div>`;
   openModal();
-  document.getElementById('m_save').onclick=()=>{
-    const row={id:id||uid(),area:document.getElementById('m_fa').value.trim(),processo:document.getElementById('m_fp').value.trim(),
-      status:document.getElementById('m_fs').value,obs:document.getElementById('m_fo').value.trim()};
-    if(!row.area||!row.processo){alert('Área e processo obrigatórios');return}
-    if(id){const i=DB.fluxos.findIndex(x=>x.id===id);if(i>=0)DB.fluxos[i]=row}else DB.fluxos.push(row);
-    saveDB();closeModal();showView('sgq-flux');
+  document.getElementById('m_cancel').onclick=()=>closeModal();
+  document.getElementById('m_save').onclick=function(ev){
+    ev.preventDefault();
+    try{
+      const area=(document.getElementById('m_fa').value||'').trim();
+      const processo=(document.getElementById('m_fp').value||'').trim();
+      if(!area||!processo){alert('Área e processo obrigatórios');return}
+      const row={id:id||uid(),area,processo,status:document.getElementById('m_fs').value,obs:(document.getElementById('m_fo').value||'').trim()};
+      if(!Array.isArray(DB.fluxos)) DB.fluxos=[];
+      if(id){const i=DB.fluxos.findIndex(x=>x.id===id);if(i>=0)DB.fluxos[i]=Object.assign({},DB.fluxos[i],row);else DB.fluxos.push(row)}
+      else DB.fluxos.push(row);
+      if(!saveDB()) return;
+      closeModal(); showView('sgq-flux');
+    }catch(err){console.error(err);alert('Erro ao salvar: '+(err.message||err))}
   };
 }
+
 
 /* ===== TREIN ===== */
 function personPct(p){
@@ -783,25 +829,64 @@ function bindTrein(){
 }
 function openTreinModal(id){
   const p=id?DB.people.find(x=>x.id===id):null;
-  const mods=p&&p.mods||{};
+  const mods=(p&&p.mods)||{};
   const opts=['','Concluído On-line','Concluído Prático','Apto p/ Mód. Online','Apto p/ Mód. Prático','Inscrito (Online)','Inscrito (Prático)','Reprovado'];
-  const modHtml=MODULES_T.map(m=>`<div class="fg"><label>${esc(m)}</label><select data-mod="${esc(m)}">${opts.map(o=>`<option ${mods[m]===o?'selected':''}>${o||'—'}</option>`).join('')}</select></div>`).join('');
-  document.getElementById('modalBox').innerHTML=`<h2>${p?'Editar':'Novo'} técnico</h2>
-    <div class="fg"><label>Nome</label><input id="m_tn" value="${esc(p&&p.nome||'')}"></div>
-    <div class="fg"><label>Região</label><input id="m_tr" value="${esc(p&&p.regiao||'')}"></div>
-    ${modHtml}
-    <div class="modal-actions"><button class="btn btn-s" onclick="closeModal()">Cancelar</button>
-    <button class="btn btn-g" id="m_save">Salvar</button></div>`;
+  const modRows=(MODULES_T||[]).map(m=>{
+    const cur=mods[m]||'';
+    const optsHtml=opts.map(o=>`<option value="${esc(o)}" ${cur===o?'selected':''}>${o||'—'}</option>`).join('');
+    return `<div class="fg"><label>${esc(m)}</label><select data-mod="${esc(m)}">${optsHtml}</select></div>`;
+  }).join('');
+  document.getElementById('modalBox').innerHTML=`
+    <div class="modal-head"><h2>${p?'Editar':'Novo'} técnico</h2></div>
+    <div class="modal-body">
+      <div class="fg"><label>Nome *</label><input id="m_tn" value="${esc(p&&p.nome||'')}" autocomplete="off"></div>
+      <div class="fg"><label>Região (ex.: São Leopoldo, RS)</label><input id="m_tr" value="${esc(p&&p.regiao||'')}" placeholder="Cidade, UF" autocomplete="off"></div>
+      <p style="font-size:11px;color:var(--muted);margin:8px 0 4px;font-weight:700;text-transform:uppercase">Status por módulo</p>
+      ${modRows||'<p style="color:var(--muted);font-size:13px">Nenhum módulo configurado.</p>'}
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-s" id="m_cancel">Cancelar</button>
+      <button type="button" class="btn btn-g" id="m_save">Salvar</button>
+    </div>`;
   openModal();
-  document.getElementById('m_save').onclick=()=>{
-    const m={};
-    document.querySelectorAll('#modalBox [data-mod]').forEach(s=>{const v=s.value;if(v&&v!=='—')m[s.getAttribute('data-mod')]=v});
-    const row={id:id||uid(),nome:document.getElementById('m_tn').value.trim(),regiao:document.getElementById('m_tr').value.trim(),mods:m};
-    if(!row.nome){alert('Nome obrigatório');return}
-    if(id){const i=DB.people.findIndex(x=>x.id===id);if(i>=0)DB.people[i]=row}else DB.people.push(row);
-    saveDB();closeModal();showView('trein-lista');
+  document.getElementById('m_cancel').onclick=()=>closeModal();
+  document.getElementById('m_save').onclick=function(ev){
+    ev.preventDefault();
+    try{
+      const nomeEl=document.getElementById('m_tn');
+      const regEl=document.getElementById('m_tr');
+      if(!nomeEl){alert('Erro no formulário');return}
+      const nome=(nomeEl.value||'').trim();
+      if(!nome){alert('Nome obrigatório');nomeEl.focus();return}
+      const regiao=(regEl&&regEl.value||'').trim();
+      let estado='';
+      if(regiao.includes(',')) estado=regiao.split(',').pop().trim().slice(0,2).toUpperCase();
+      else { const mm=regiao.match(/([A-Za-z]{2})/); if(mm) estado=mm[1].toUpperCase(); }
+      const m={};
+      document.querySelectorAll('#modalBox [data-mod]').forEach(s=>{
+        const key=s.getAttribute('data-mod');
+        const v=(s.value||'').trim();
+        if(key && v) m[key]=v;
+      });
+      const row={id:id||uid(), nome, regiao, estado, mods:m};
+      if(!Array.isArray(DB.people)) DB.people=[];
+      if(id){
+        const ix=DB.people.findIndex(x=>x.id===id);
+        if(ix>=0) DB.people[ix]=Object.assign({}, DB.people[ix], row);
+        else DB.people.push(row);
+      } else {
+        DB.people.push(row);
+      }
+      if(!saveDB()) return;
+      closeModal();
+      showView('trein-lista');
+    }catch(err){
+      console.error(err);
+      alert('Erro ao salvar técnico: '+(err.message||err));
+    }
   };
 }
+
 
 /* ===== ASEC ===== */
 function renderAsecDash(){
@@ -893,27 +978,69 @@ function bindMetro(){
 }
 function openMetroModal(id){
   const i=id?(DB.instruments||[]).find(x=>x.id===id):null;
-  document.getElementById('modalBox').innerHTML=`<h2>${i?'Editar':'Novo'} instrumento</h2>
-    <div class="fg"><label>Equipamento</label><input id="m_eq" value="${esc(i&&i.equipamento||'')}"></div>
-    <div class="fg"><label>Série</label><input id="m_se" value="${esc(i&&i.serie||'')}"></div>
-    <div class="fg"><label>Tipo</label><input id="m_ti" value="${esc(i&&i.tipo||'')}"></div>
-    <div class="fg"><label>Periodicidade (meses)</label><input type="number" id="m_pe" value="${i&&i.periodicidade||12}"></div>
-    <div class="fg"><label>Última calibração</label><input type="date" id="m_ul" value="${esc(i&&i.ultima||'')}"></div>
-    <div class="modal-actions"><button class="btn btn-s" onclick="closeModal()">Cancelar</button>
-    <button class="btn btn-g" id="m_save">Salvar</button></div>`;
+  const sits=['Ativo','Inativo','Em manutenção','Aguardando calibração'];
+  document.getElementById('modalBox').innerHTML=`
+    <div class="modal-head"><h2>${i?'Editar':'Novo'} instrumento</h2></div>
+    <div class="modal-body">
+      <div class="fg"><label>Equipamento *</label><input id="m_eq" value="${esc(i&&i.equipamento||'')}"></div>
+      <div class="grid2" style="gap:10px">
+        <div class="fg"><label>Tipo</label><input id="m_ti" value="${esc(i&&i.tipo||'')}"></div>
+        <div class="fg"><label>Série / Código</label><input id="m_se" value="${esc(i&&i.serie||'')}"></div>
+      </div>
+      <div class="grid2" style="gap:10px">
+        <div class="fg"><label>Fabricante</label><input id="m_fab" value="${esc(i&&i.fabricante||'')}"></div>
+        <div class="fg"><label>Modelo</label><input id="m_mod" value="${esc(i&&i.modelo||'')}"></div>
+      </div>
+      <div class="grid2" style="gap:10px">
+        <div class="fg"><label>Setor</label><input id="m_set" value="${esc(i&&i.setor||'')}"></div>
+        <div class="fg"><label>Responsável</label><input id="m_resp" value="${esc(i&&i.responsavel||'')}"></div>
+      </div>
+      <div class="grid2" style="gap:10px">
+        <div class="fg"><label>Periodicidade (meses)</label><input type="number" id="m_pe" min="1" value="${i&&i.periodicidade||12}"></div>
+        <div class="fg"><label>Última calibração</label><input type="date" id="m_ul" value="${esc(i&&i.ultima||'')}"></div>
+      </div>
+      <div class="grid2" style="gap:10px">
+        <div class="fg"><label>Situação</label><select id="m_si">${sits.map(t=>`<option ${i&&i.situacao===t?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div class="fg"><label>EMP (limite)</label><input id="m_emp" value="${esc(i&&i.emp||'')}" placeholder="ex.: ±0,04 mm"></div>
+      </div>
+      <div class="fg"><label>Observações</label><textarea id="m_obs">${esc(i&&i.obs||'')}</textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-s" id="m_cancel">Cancelar</button>
+      <button type="button" class="btn btn-g" id="m_save">Salvar</button>
+    </div>`;
   openModal();
-  document.getElementById('m_save').onclick=()=>{
-    const row={id:id||uid(),equipamento:document.getElementById('m_eq').value.trim(),serie:document.getElementById('m_se').value.trim(),
-      tipo:document.getElementById('m_ti').value.trim(),periodicidade:Number(document.getElementById('m_pe').value)||12,
-      ultima:document.getElementById('m_ul').value||null,situacao:'Ativo'};
-    if(!row.equipamento){alert('Equipamento obrigatório');return}
-    if(!DB.instruments) DB.instruments=[];
-    if(id){const ix=DB.instruments.findIndex(x=>x.id===id);if(ix>=0)DB.instruments[ix]=row}else DB.instruments.push(row);
-    saveDB();closeModal();showView('metro-lista');
+  document.getElementById('m_cancel').onclick=()=>closeModal();
+  document.getElementById('m_save').onclick=function(ev){
+    ev.preventDefault();
+    try{
+      const equipamento=(document.getElementById('m_eq').value||'').trim();
+      if(!equipamento){alert('Equipamento obrigatório');return}
+      const row={
+        id:id||uid(), equipamento,
+        tipo:(document.getElementById('m_ti').value||'').trim(),
+        serie:(document.getElementById('m_se').value||'').trim(),
+        fabricante:(document.getElementById('m_fab').value||'').trim(),
+        modelo:(document.getElementById('m_mod').value||'').trim(),
+        setor:(document.getElementById('m_set').value||'').trim(),
+        responsavel:(document.getElementById('m_resp').value||'').trim(),
+        periodicidade:Number(document.getElementById('m_pe').value)||12,
+        ultima:document.getElementById('m_ul').value||null,
+        situacao:document.getElementById('m_si').value,
+        emp:(document.getElementById('m_emp').value||'').trim(),
+        obs:(document.getElementById('m_obs').value||'').trim()
+      };
+      if(!Array.isArray(DB.instruments)) DB.instruments=[];
+      if(id){const ix=DB.instruments.findIndex(x=>x.id===id);if(ix>=0)DB.instruments[ix]=Object.assign({},DB.instruments[ix],row);else DB.instruments.push(row)}
+      else DB.instruments.push(row);
+      if(!saveDB()) return;
+      closeModal(); showView('metro-lista');
+    }catch(err){console.error(err);alert('Erro ao salvar: '+(err.message||err))}
   };
 }
 
-function openModal(){document.getElementById('modalBg').classList.add('on')}
+
+function openModal(){const bg=document.getElementById('modalBg');if(bg)bg.classList.add('on');}
 function closeModal(){document.getElementById('modalBg').classList.remove('on')}
 document.getElementById('modalBg').addEventListener('click',e=>{if(e.target.id==='modalBg')closeModal()});
 
