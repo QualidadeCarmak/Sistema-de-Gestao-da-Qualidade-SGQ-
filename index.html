@@ -261,7 +261,7 @@ tr:hover td{background:var(--tint)}
 .vbar-pair{display:flex;align-items:flex-end;gap:3px;width:100%;height:100%;justify-content:center}
 .vbar{width:42%;border-radius:4px 4px 0 0;min-height:2px;transition:height .2s}
 .vbar.real{background:linear-gradient(180deg,var(--gold,#C4A35A),var(--navy,#1a1a1a))}
-.vbar.plan{background:rgba(0,0,0,.18)}
+.vbar.plan{background:linear-gradient(180deg,#5B7C99,#3A556E)}
 .vbar-lab{font-size:10px;color:var(--muted);margin-top:6px;text-align:center}
 .vbar-legend{display:flex;gap:14px;margin-top:10px;font-size:11px;color:var(--muted)}
 .vbar-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
@@ -509,6 +509,53 @@ async function pushFluxoToCloud(row) {
   } catch (e) { console.warn("pushFluxoToCloud", e); }
 }
 
+async function pushDealerToCloud(row) {
+  if (!sessionStorage.getItem('sgq_access')) return;
+  try {
+    const mesIso = dealerMesToIso(row.mes);
+    const payload = {
+      dealer: row.dealer,
+      mes: mesIso,
+      nota_geral: row.geral != null ? Number(row.geral) : null,
+      nota_mandatoria: row.mandatoria != null ? Number(row.mandatoria) : null
+    };
+    let existing = null;
+    if (row.id && String(row.id).length > 10) {
+      existing = [{ id: row.id }];
+    } else {
+      existing = await sbRest('GET', 'dealer_evaluation', {
+        query: 'dealer=eq.' + encodeURIComponent(row.dealer) + '&mes=eq.' + encodeURIComponent(mesIso) + '&select=id'
+      });
+    }
+    if (existing && existing[0] && existing[0].id) {
+      await sbRest('PATCH', 'dealer_evaluation', { query: 'id=eq.' + existing[0].id, body: payload });
+      row.id = existing[0].id;
+    } else {
+      const ins = await sbRest('POST', 'dealer_evaluation', { body: payload });
+      if (ins && ins[0] && ins[0].id) row.id = ins[0].id;
+    }
+  } catch (e) { console.warn('pushDealerToCloud', e); throw e; }
+}
+
+async function deleteDealerFromCloud(id) {
+  if (!sessionStorage.getItem('sgq_access') || !id) return;
+  try {
+    await sbRest('DELETE', 'dealer_evaluation', { query: 'id=eq.' + encodeURIComponent(id) });
+  } catch (e) { console.warn('deleteDealerFromCloud', e); throw e; }
+}
+
+function dealerMesToIso(mes) {
+  const s = String(mes || '');
+  if (/^\d{4}-\d{2}/.test(s)) return s.slice(0, 10);
+  const MES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const ix = MES_PT.indexOf(s);
+  if (ix >= 0) {
+    const y = new Date().getFullYear();
+    return y + '-' + String(ix + 1).padStart(2, '0') + '-01';
+  }
+  return s || null;
+}
+
 async function pushInstrumentoToCloud(row) {
   if (!sessionStorage.getItem('sgq_access')) return;
   try {
@@ -598,10 +645,11 @@ async function pullAllFromCloud(){
         mes: a.mes, realizadas: a.realizadas, planejadas: a.planejadas
       }));
     }
-    /* Integração live: contagens a partir de auditorias (realizadas) + cronograma (planejadas) */
+    /* Integração live: Jan–Jul = ciclo fechado (histórico); Ago–Dez = só live (relatório/cronograma) */
     try{
       const year = new Date().getFullYear();
       const MES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+      const CLOSED = new Set(['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho']);
       const byMes = {};
       MES_PT.forEach(m=>{ byMes[m]={mes:m, realizadas:0, planejadas:0}; });
       let liveRows=[], cronoRows=[];
@@ -627,21 +675,26 @@ async function pullAllFromCloud(){
         if(y!==year || !mo || mo<1 || mo>12) return;
         byMes[MES_PT[mo-1]].planejadas++;
       });
-      const hasLive = (liveRows&&liveRows.length) || (cronoRows&&cronoRows.length);
-      if(hasLive){
-        if(!DB.asec) DB.asec={};
-        /* Mescla: se houver seed/resumo, usa o maior entre resumo e contagem live (não zera histórico manual) */
-        const prev = {};
-        (DB.asec.auditorias||[]).forEach(a=>{ if(a&&a.mes) prev[a.mes]=a; });
-        DB.asec.auditorias = MES_PT.map(m=>{
-          const live = byMes[m];
+      if(!DB.asec) DB.asec={};
+      const prev = {};
+      (DB.asec.auditorias||[]).forEach(a=>{ if(a&&a.mes) prev[a.mes]=a; });
+      DB.asec.auditorias = MES_PT.map(m=>{
+        if(CLOSED.has(m)){
           const old = prev[m]||{};
-          const real = Math.max(Number(old.realizadas)||0, live.realizadas||0);
-          const plan = Math.max(Number(old.planejadas)||0, live.planejadas||0);
-          return { mes:m, realizadas: real||null, planejadas: plan||null };
-        });
-        console.log('ASEC live counts', { year, auditorias:(liveRows||[]).length, cronograma:(cronoRows||[]).length });
-      }
+          return {
+            mes: m,
+            realizadas: old.realizadas!=null ? Number(old.realizadas) : null,
+            planejadas: old.planejadas!=null ? Number(old.planejadas) : null
+          };
+        }
+        const live = byMes[m];
+        return {
+          mes: m,
+          realizadas: (live.realizadas||0) > 0 ? live.realizadas : null,
+          planejadas: (live.planejadas||0) > 0 ? live.planejadas : null
+        };
+      });
+      console.log('ASEC counts', { year, closed:'Jan-Jul', liveFrom:'Ago+', auditorias:(liveRows||[]).length, cronograma:(cronoRows||[]).length });
     }catch(e){ console.warn('ASEC live merge', e); }
     if(nc && nc.length){
       if(!DB.asec) DB.asec={};
@@ -651,7 +704,7 @@ async function pullAllFromCloud(){
     if(dealer && dealer.length){
       if(!DB.asec) DB.asec={};
       DB.asec.dealer = dealer.map(d=>({
-        dealer:d.dealer, mes:d.mes, geral:d.nota_geral, mandatoria:d.nota_mandatoria
+        id:d.id||null, dealer:d.dealer, mes:d.mes, geral:d.nota_geral, mandatoria:d.nota_mandatoria
       }));
     }
     if(assertv && assertv.length){
@@ -873,7 +926,8 @@ const HUBS={
   ]},
   asec:{label:'ASEC Toyota', items:[
     {id:'asec-dash',label:'Dashboard'},
-    {id:'asec-checklist',label:'Checklist / Relatório'}
+    {id:'asec-checklist',label:'Checklist / Relatório'},
+    {id:'asec-dealer',label:'Dealer Evaluation'}
   ]},
   metro:{label:'Metrologia', items:[
     {id:'metro-dash',label:'Dashboard'},
@@ -952,6 +1006,7 @@ function showView(v){
         <p style="margin-top:1rem;font-size:12px;color:var(--muted)">Dica: deixe as duas abas abertas. Ao salvar um relatório ou incluir data no cronograma, volte aqui e recarregue o Dashboard ASEC (ou faça logout/login) para atualizar os números.</p>
       </div>`;
   }
+  else if(v==='asec-dealer'){ main.innerHTML=renderDealerShell(); bindDealer(); }
   else if(v==='metro-dash') main.innerHTML=renderMetroDash();
   else if(v==='metro-lista'){ main.innerHTML=renderMetroShell(); bindMetro(); }
 
@@ -1875,7 +1930,7 @@ function vBarCompare(rows){
       <div class="vbar plan" style="height:${hb}%" title="Planejadas: ${r.b}"></div>
     </div><div class="vbar-lab">${esc(r.l)}</div></div>`;
   }).join('');
-  return `<div class="vbar-wrap">${cols}</div><div class="vbar-legend"><span><i style="background:linear-gradient(180deg,#C4A35A,#1a1a1a)"></i>Realizadas</span><span><i style="background:rgba(0,0,0,.18)"></i>Planejadas</span></div>`;
+  return `<div class="vbar-wrap">${cols}</div><div class="vbar-legend"><span><i style="background:linear-gradient(180deg,#C4A35A,#1a1a1a)"></i>Realizadas</span><span><i style="background:linear-gradient(180deg,#5B7C99,#3A556E)"></i>Planejadas</span></div>`;
 }
 function vBarCompareNC(rows){
   if(!rows||!rows.length) return '<p style="color:var(--muted);font-size:13px">Sem dados</p>';
@@ -2081,7 +2136,7 @@ function renderAsecDash(){
     <div class="kpi"><div class="l">Sugestões</div><div class="v">${sugTot}</div><div class="s">melhoria</div></div>
   </div>
   <div class="panel"><h3>Auditorias realizadas × planejadas</h3>
-    <p style="font-size:11px;color:var(--muted);margin:-4px 0 10px">Realizadas = relatórios em <code>auditorias</code> · Planejadas = datas em <code>cronograma</code> (ano atual)</p>
+    <p style="font-size:11px;color:var(--muted);margin:-4px 0 10px">Jan–Jul: ciclo fechado (histórico). Ago–Dez: <strong>realizadas</strong> = relatórios salvos · <strong>planejadas</strong> = cronograma</p>
     ${vBarCompare(audRows)}</div>
   <div class="grid2">
     <div class="panel"><h3>NC × Sugestões — Matriz RS</h3>${vBarCompareNC(ncMatRows)}</div>
@@ -2223,6 +2278,169 @@ function openMetroModal(id){
   };
 }
 
+
+/* ===== DEALER EVALUATION CRUD ===== */
+const DEALER_NAMES = [
+  'Carmak - São Leopoldo RS',
+  'Carmak - Itajaí SC',
+  'Carmak - Campo Grande MS'
+];
+
+function renderDealerShell(){
+  return `<div class="page-h"><h1>Dealer Evaluation</h1>
+    <p>Cadastre a nota geral e a nota mandatória por unidade e mês. Os cards e gráficos do Dashboard usam a última nota de cada dealer.</p></div>
+  <div class="toolbar">
+    <div class="fg"><label>Filtrar dealer</label>
+      <select id="dlFilter"><option value="">Todos</option>${DEALER_NAMES.map(n=>`<option>${esc(n)}</option>`).join('')}</select>
+    </div>
+    <div class="fg"><label>Filtrar mês</label>
+      <select id="dlMesF"><option value="">Todos</option>${['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'].map(m=>`<option>${m}</option>`).join('')}</select>
+    </div>
+    <button type="button" class="btn btn-g" id="btnNewDealer">+ Nova avaliação</button>
+  </div>
+  <div class="table-wrap"><table><thead><tr>
+    <th>Dealer</th><th>Mês</th><th>Nota Geral</th><th>Nota Mandatória</th><th></th>
+  </tr></thead><tbody id="dlBody"></tbody></table></div>`;
+}
+
+function bindDealer(){
+  const MES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  function labelMes(m){
+    const s=String(m||'');
+    if(MES_PT.includes(s)) return s;
+    const mm=s.match(/^(\d{4})-(\d{2})/);
+    if(mm){ const mo=parseInt(mm[2],10); return MES_PT[mo-1]||s; }
+    return s;
+  }
+  function paint(){
+    if(!DB.asec) DB.asec={};
+    if(!Array.isArray(DB.asec.dealer)) DB.asec.dealer=[];
+    const fd=(document.getElementById('dlFilter').value||'');
+    const fm=(document.getElementById('dlMesF').value||'');
+    let rows=DB.asec.dealer.slice().sort((a,b)=>String(b.mes).localeCompare(String(a.mes))||String(a.dealer).localeCompare(String(b.dealer)));
+    if(fd) rows=rows.filter(r=>r.dealer===fd);
+    if(fm) rows=rows.filter(r=>labelMes(r.mes)===fm);
+    document.getElementById('dlBody').innerHTML=rows.map((r,idx)=>{
+      const g=r.geral!=null? (Math.round(Number(r.geral)*1000)/10).toFixed(1)+'%':'—';
+      const m=r.mandatoria!=null? (Math.round(Number(r.mandatoria)*1000)/10).toFixed(1)+'%':'—';
+      const key=r.id||(r.dealer+'|'+r.mes+'|'+idx);
+      return `<tr>
+        <td><b>${esc(r.dealer)}</b></td>
+        <td>${esc(labelMes(r.mes))}</td>
+        <td>${g}</td>
+        <td>${m}</td>
+        <td>
+          <button class="btn btn-s" data-ed="${esc(key)}">Editar</button>
+          <button class="btn btn-d" data-del="${esc(key)}">Excluir</button>
+        </td></tr>`;
+    }).join('')||`<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Nenhuma avaliação — clique em + Nova avaliação</td></tr>`;
+    document.querySelectorAll('#dlBody [data-ed]').forEach(b=>{
+      b.onclick=()=>{
+        const key=b.getAttribute('data-ed');
+        const row=DB.asec.dealer.find((r,i)=>(r.id||(r.dealer+'|'+r.mes+'|'+i))===key);
+        openDealerModal(row);
+      };
+    });
+    document.querySelectorAll('#dlBody [data-del]').forEach(b=>{
+      b.onclick=async()=>{
+        if(!confirm('Excluir esta avaliação?')) return;
+        const key=b.getAttribute('data-del');
+        const ix=DB.asec.dealer.findIndex((r,i)=>(r.id||(r.dealer+'|'+r.mes+'|'+i))===key);
+        if(ix<0) return;
+        const row=DB.asec.dealer[ix];
+        try{
+          if(row.id) await deleteDealerFromCloud(row.id);
+          DB.asec.dealer.splice(ix,1);
+          saveDB();
+          paint();
+        }catch(e){ alert('Erro ao excluir: '+(e.message||e)); }
+      };
+    });
+  }
+  document.getElementById('dlFilter').onchange=paint;
+  document.getElementById('dlMesF').onchange=paint;
+  document.getElementById('btnNewDealer').onclick=()=>openDealerModal(null);
+  paint();
+}
+
+function openDealerModal(row){
+  const MES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  function labelMes(m){
+    const s=String(m||'');
+    if(MES_PT.includes(s)) return s;
+    const mm=s.match(/^(\d{4})-(\d{2})/);
+    if(mm) return MES_PT[parseInt(mm[2],10)-1]||s;
+    return s;
+  }
+  const curMes=row?labelMes(row.mes):MES_PT[new Date().getMonth()];
+  const gPct=row&&row.geral!=null? (Math.round(Number(row.geral)*1000)/10) : '';
+  const mPct=row&&row.mandatoria!=null? (Math.round(Number(row.mandatoria)*1000)/10) : '';
+  document.getElementById('modalBox').innerHTML=`
+    <div class="modal-head"><h2>${row?'Editar':'Nova'} avaliação de dealer</h2></div>
+    <div class="modal-body">
+      <div class="fg"><label>Dealer *</label>
+        <select id="dl_name">${DEALER_NAMES.map(n=>`<option ${row&&row.dealer===n?'selected':''}>${esc(n)}</option>`).join('')}
+        <option value="__other__">Outro (digitar)…</option></select>
+      </div>
+      <div class="fg" id="dl_other_wrap" style="display:none"><label>Nome do dealer</label><input id="dl_other" placeholder="Carmak - …"></div>
+      <div class="fg"><label>Mês *</label>
+        <select id="dl_mes">${MES_PT.map(m=>`<option ${m===curMes?'selected':''}>${m}</option>`).join('')}</select>
+      </div>
+      <div class="grid2" style="gap:10px">
+        <div class="fg"><label>Nota Geral (%) *</label><input type="number" id="dl_g" min="0" max="100" step="0.1" value="${gPct}" placeholder="ex.: 99"></div>
+        <div class="fg"><label>Nota Mandatória (%)</label><input type="number" id="dl_m" min="0" max="100" step="0.1" value="${mPct}" placeholder="ex.: 98"></div>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-top:8px">Informe a nota em porcentagem (0 a 100). O dashboard converte e calcula o ranking automaticamente.</p>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-s" id="dl_cancel">Cancelar</button>
+      <button type="button" class="btn btn-g" id="dl_save">Salvar</button>
+    </div>`;
+  openModal();
+  const sel=document.getElementById('dl_name');
+  const ow=document.getElementById('dl_other_wrap');
+  sel.onchange=()=>{ ow.style.display=sel.value==='__other__'?'block':'none'; };
+  if(row && !DEALER_NAMES.includes(row.dealer)){
+    sel.value='__other__'; ow.style.display='block';
+    document.getElementById('dl_other').value=row.dealer||'';
+  }
+  document.getElementById('dl_cancel').onclick=()=>closeModal();
+  document.getElementById('dl_save').onclick=async function(){
+    try{
+      let dealer=sel.value;
+      if(dealer==='__other__') dealer=(document.getElementById('dl_other').value||'').trim();
+      if(!dealer){ alert('Informe o dealer'); return; }
+      const mes=document.getElementById('dl_mes').value;
+      const gRaw=document.getElementById('dl_g').value;
+      const mRaw=document.getElementById('dl_m').value;
+      if(gRaw===''||gRaw==null){ alert('Nota Geral obrigatória'); return; }
+      const geral=Number(gRaw)/100;
+      const mandatoria=mRaw===''||mRaw==null? null : Number(mRaw)/100;
+      if(isNaN(geral)||geral<0||geral>1){ alert('Nota Geral inválida (0–100)'); return; }
+      if(mandatoria!=null && (isNaN(mandatoria)||mandatoria<0||mandatoria>1)){ alert('Nota Mandatória inválida (0–100)'); return; }
+      if(!DB.asec) DB.asec={};
+      if(!Array.isArray(DB.asec.dealer)) DB.asec.dealer=[];
+      const payload={
+        id: row && row.id ? row.id : null,
+        dealer, mes, geral, mandatoria
+      };
+      await pushDealerToCloud(payload);
+      if(row){
+        const ix=DB.asec.dealer.indexOf(row);
+        if(ix>=0) DB.asec.dealer[ix]=Object.assign({}, row, payload);
+        else DB.asec.dealer.push(payload);
+      } else {
+        DB.asec.dealer.push(payload);
+      }
+      saveDB();
+      closeModal();
+      showView('asec-dealer');
+    }catch(err){
+      console.error(err);
+      alert('Erro ao salvar: '+(err.message||err));
+    }
+  };
+}
 
 function openModal(){const bg=document.getElementById('modalBg');if(bg)bg.classList.add('on');}
 function closeModal(){document.getElementById('modalBg').classList.remove('on')}
