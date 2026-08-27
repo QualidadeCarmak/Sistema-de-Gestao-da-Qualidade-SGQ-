@@ -1623,11 +1623,7 @@ function renderTreinDash(){
       <div id="map-svg-wrap"></div>
       <div class="map-legend" id="map-legend"></div>
       <div id="map-tooltip"></div>
-    </div><div class="panel">
-    <h3>Prioridades — Aptos para próximo módulo</h3>
-    <p style="font-size:11px;color:var(--muted);margin:-4px 0 12px">Técnicos com status "Apto" aguardando turma</p>
-    <div class="apto-grid">${aptoCards}</div>
-  </div>
+    </div>
 <div class="panel">
     <h3>Prioridades — Aptos para próximo módulo</h3>
     <p style="font-size:11px;color:var(--muted);margin:-4px 0 12px">Técnicos com status "Apto" aguardando turma</p>
@@ -1860,16 +1856,17 @@ function lineChartMulti(series, labels, height, opts){
   const n=labels.length||1;
   const xAt=i=>padL+(w-padL-padR)*(n===1?0.5:i/(n-1));
   const yAt=v=>padT+(h-padT-padB)*(1-(v-min)/(max-min));
-  const uid='lc'+Math.random().toString(36).slice(2,8);
-  let paths='', hit='';
-  series.forEach((s,si)=>{
+  const tipId='tip_'+Math.random().toString(36).slice(2,9);
+  let paths='', hits='';
+  series.forEach((s)=>{
     const pts=[];
-    s.values.forEach((v,i)=>{ if(v!=null && !isNaN(v)) pts.push([xAt(i),yAt(v),v,i]); });
+    s.values.forEach((v,i)=>{ if(v!=null && !isNaN(v)) pts.push([xAt(i),yAt(v),v,i,labels[i]||'']); });
     if(pts.length>1) paths+=`<path d="M${pts.map(p=>p[0]+','+p[1]).join(' L')}" fill="none" stroke="${s.color}" stroke-width="2.5"/>`;
     pts.forEach(p=>{
-      paths+=`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="${s.color}"/>`;
+      paths+=`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="${s.color}" stroke="#fff" stroke-width="1"/>`;
       const pct=Math.round(p[2]*1000)/10;
-      hit+=`<circle class="lc-hit" data-tip="${esc(s.name)}: ${pct}%" cx="${p[0]}" cy="${p[1]}" r="10" fill="transparent" style="cursor:pointer"/>`;
+      const tipTxt=esc(s.name)+' · '+esc(String(p[4]))+': '+pct+'%';
+      hits+=`<circle class="lc-hit" data-tip="${tipTxt}" cx="${p[0]}" cy="${p[1]}" r="12" fill="rgba(0,0,0,0.001)" style="cursor:pointer"/>`;
     });
   });
   let grid='';
@@ -1880,17 +1877,43 @@ function lineChartMulti(series, labels, height, opts){
   }
   const labs=labels.map((lb,i)=>`<text x="${xAt(i)}" y="${h-6}" font-size="10" text-anchor="middle" fill="#888">${esc(String(lb).slice(0,3))}</text>`).join('');
   const legend=series.map(s=>`<span style="margin-right:12px"><i style="display:inline-block;width:10px;height:3px;background:${s.color};vertical-align:middle;margin-right:4px"></i>${esc(s.name)}</span>`).join('');
-  // tooltip div sibling via onmouseover on hits - use title attribute as simple hover
-  const hitsWithTitle = hit.replace(/data-tip="([^"]*)"/g, 'data-tip="$1" title="$1"');
-  return `<svg class="line-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">${grid}${paths}${hitsWithTitle}${labs}</svg><div style="font-size:11px;color:var(--muted);margin-top:4px">${legend}</div>`;
+  // wrapper with floating tip
+  setTimeout(()=>{
+    const wrap=document.getElementById(tipId);
+    if(!wrap) return;
+    const tip=wrap.querySelector('.lc-float-tip');
+    const svg=wrap.querySelector('svg');
+    if(!svg||!tip) return;
+    svg.querySelectorAll('.lc-hit').forEach(c=>{
+      c.addEventListener('mouseenter', (ev)=>{
+        tip.textContent=c.getAttribute('data-tip')||'';
+        tip.style.display='block';
+        const rect=wrap.getBoundingClientRect();
+        tip.style.left=(ev.clientX-rect.left+12)+'px';
+        tip.style.top=(ev.clientY-rect.top-28)+'px';
+      });
+      c.addEventListener('mousemove', (ev)=>{
+        const rect=wrap.getBoundingClientRect();
+        tip.style.left=(ev.clientX-rect.left+12)+'px';
+        tip.style.top=(ev.clientY-rect.top-28)+'px';
+      });
+      c.addEventListener('mouseleave', ()=>{ tip.style.display='none'; });
+    });
+  }, 30);
+  return `<div id="${tipId}" style="position:relative">
+    <div class="lc-float-tip" style="display:none;position:absolute;z-index:5;background:#1a1a1a;color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:700;pointer-events:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.25)"></div>
+    <svg class="line-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">${grid}${paths}${hits}${labs}</svg>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">${legend}</div>
+  </div>`;
 }
 function themeAssertColors(){
   const cs=getComputedStyle(document.documentElement);
   const gold=(cs.getPropertyValue('--gold').trim()||'#C4A35A');
   const navy=(cs.getPropertyValue('--navy').trim()||'#1A1A1A');
-  // palette derived from theme (navy/gold family) — not rainbow
   return [gold, navy, '#8B7355', '#5C6B7A', '#A89060', '#3D4F5F'];
 }
+
+
 
 const MES_ABBR={'Janeiro':'Jan','Fevereiro':'Fev','Março':'Mar','Abril':'Abr','Maio':'Mai','Junho':'Jun','Julho':'Jul','Agosto':'Ago','Setembro':'Set','Outubro':'Out','Novembro':'Nov','Dezembro':'Dez'};
 const MES_ORDER=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
