@@ -39,9 +39,12 @@ button,input,select,textarea{font-family:inherit}
 .login-card .sub{color:var(--chip);font-size:.82rem;margin-bottom:1.2rem}
 .login-card label{display:block;text-align:left;color:var(--chip);font-size:.75rem;font-weight:600;margin-bottom:.25rem}
 .login-card input{width:100%;padding:.65rem .85rem;border-radius:8px;border:1px solid rgba(212,181,106,.35);margin-bottom:.85rem;font-size:.95rem}
-.login-card .btn{width:100%;padding:.75rem;border:none;border-radius:8px;background:linear-gradient(135deg,#C4A35A,#a3812f);color:#042e1f;font-weight:800;cursor:pointer;font-size:1rem}
+.login-card .btn{width:100%;padding:.75rem;border:none;border-radius:8px;background:linear-gradient(135deg,var(--accent,#D4B56A),var(--gold,#C4A35A));color:var(--top1,#042e1f);font-weight:800;cursor:pointer;font-size:1rem;transition:opacity .15s,filter .15s}
+.login-card .btn:hover{filter:brightness(1.06)}
+.login-card .btn:disabled{opacity:.8;cursor:wait;filter:none}
 .login-err{display:none;background:rgba(164,52,74,.3);color:#ffc9d0;padding:.5rem;border-radius:8px;font-size:.85rem;margin-bottom:.75rem}
 .login-err.show{display:block}
+.login-err.loading{background:rgba(255,255,255,.12)!important;color:var(--chip,#E8D5A3)!important;border:1px solid rgba(212,181,106,.35)}
 
 /* GUIA */
 #guia{display:none;min-height:100vh;background:
@@ -595,6 +598,51 @@ async function pullAllFromCloud(){
         mes: a.mes, realizadas: a.realizadas, planejadas: a.planejadas
       }));
     }
+    /* Integração live: contagens a partir de auditorias (realizadas) + cronograma (planejadas) */
+    try{
+      const year = new Date().getFullYear();
+      const MES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+      const byMes = {};
+      MES_PT.forEach(m=>{ byMes[m]={mes:m, realizadas:0, planejadas:0}; });
+      let liveRows=[], cronoRows=[];
+      try{
+        liveRows = await sbRest('GET','auditorias',{query:'select=id,audit_date,created_at&order=audit_date.desc&limit=500'});
+      }catch(e){ console.warn('live auditorias', e); }
+      try{
+        cronoRows = await sbRest('GET','cronograma',{query:'select=id,scheduled_date&order=scheduled_date.asc&limit=500'});
+      }catch(e){ console.warn('live cronograma', e); }
+      (liveRows||[]).forEach(r=>{
+        const d = (r.audit_date || (r.created_at||'').slice(0,10) || '');
+        if(!d || d.length<7) return;
+        const y = parseInt(d.slice(0,4),10);
+        const mo = parseInt(d.slice(5,7),10);
+        if(y!==year || !mo || mo<1 || mo>12) return;
+        byMes[MES_PT[mo-1]].realizadas++;
+      });
+      (cronoRows||[]).forEach(r=>{
+        const d = (r.scheduled_date||'').slice(0,10);
+        if(!d || d.length<7) return;
+        const y = parseInt(d.slice(0,4),10);
+        const mo = parseInt(d.slice(5,7),10);
+        if(y!==year || !mo || mo<1 || mo>12) return;
+        byMes[MES_PT[mo-1]].planejadas++;
+      });
+      const hasLive = (liveRows&&liveRows.length) || (cronoRows&&cronoRows.length);
+      if(hasLive){
+        if(!DB.asec) DB.asec={};
+        /* Mescla: se houver seed/resumo, usa o maior entre resumo e contagem live (não zera histórico manual) */
+        const prev = {};
+        (DB.asec.auditorias||[]).forEach(a=>{ if(a&&a.mes) prev[a.mes]=a; });
+        DB.asec.auditorias = MES_PT.map(m=>{
+          const live = byMes[m];
+          const old = prev[m]||{};
+          const real = Math.max(Number(old.realizadas)||0, live.realizadas||0);
+          const plan = Math.max(Number(old.planejadas)||0, live.planejadas||0);
+          return { mes:m, realizadas: real||null, planejadas: plan||null };
+        });
+        console.log('ASEC live counts', { year, auditorias:(liveRows||[]).length, cronograma:(cronoRows||[]).length });
+      }
+    }catch(e){ console.warn('ASEC live merge', e); }
     if(nc && nc.length){
       if(!DB.asec) DB.asec={};
       DB.asec.nc_matriz = nc.filter(x=>x.unidade==='Matriz').map(x=>({mes:x.mes,nc:x.nc,sug:x.sugestoes}));
@@ -752,11 +800,9 @@ async function doLogin(){
   const u=(document.getElementById('loginUser').value||'').trim();
   const p=document.getElementById('loginPass').value||'';
   const err=document.getElementById('loginErr');
-  err.classList.remove('show');
+  err.classList.remove('show','loading');
   err.textContent='Entrando…';
-  err.classList.add('show');
-  err.style.background='rgba(255,255,255,.12)';
-  err.style.color='#E8D5A3';
+  err.classList.add('show','loading');
   const btn=document.querySelector('#login .btn');
   if(btn){btn.disabled=true;btn.textContent='Entrando…'}
   try{
@@ -770,16 +816,16 @@ async function doLogin(){
     sessionStorage.setItem('sgq_ok','1');
     sessionStorage.setItem('sgq_email', (user && user.email) || u);
     sessionStorage.setItem('sgq_access', access);
-    err.classList.remove('show');
     err.textContent='Sincronizando dados…';
-    err.classList.add('show');
+    err.classList.add('show','loading');
     loadDB();
     await pullAllFromCloud();
-    err.classList.remove('show');
+    err.classList.remove('show','loading');
     document.getElementById('login').classList.add('hidden');
     document.getElementById('guia').classList.add('on');
   }catch(e){
     console.error(e);
+    err.classList.remove('loading');
     err.style.background='';
     err.style.color='';
     err.textContent = (e && e.message) ? e.message : 'Usuário ou senha inválidos';
@@ -826,7 +872,8 @@ const HUBS={
     {id:'trein-lista',label:'Técnicos'}
   ]},
   asec:{label:'ASEC Toyota', items:[
-    {id:'asec-dash',label:'Dashboard'}
+    {id:'asec-dash',label:'Dashboard'},
+    {id:'asec-checklist',label:'Checklist / Relatório'}
   ]},
   metro:{label:'Metrologia', items:[
     {id:'metro-dash',label:'Dashboard'},
@@ -884,7 +931,27 @@ function showView(v){
   else if(v==='sgq-flux'){ main.innerHTML=renderFluxShell(); bindFlux(); }
   else if(v==='trein-dash') main.innerHTML=renderTreinDash();
   else if(v==='trein-lista'){ main.innerHTML=renderTreinShell(); bindTrein(); }
-  else if(v==='asec-dash') main.innerHTML=renderAsecDash();
+  else if(v==='asec-dash'){
+    main.innerHTML=renderAsecDash();
+    const btn=document.getElementById('btnAsecRefresh');
+    if(btn) btn.onclick=async()=>{
+      btn.disabled=true; btn.textContent='Atualizando…';
+      try{ await pullAllFromCloud(); main.innerHTML=renderAsecDash();
+        const b2=document.getElementById('btnAsecRefresh');
+        if(b2) b2.onclick=btn.onclick;
+      }catch(e){ alert('Falha ao atualizar: '+(e.message||e)); }
+      finally{ const b=document.getElementById('btnAsecRefresh'); if(b){b.disabled=false;b.textContent='↻ Atualizar do Supabase';} }
+    };
+  }
+  else if(v==='asec-checklist'){
+    main.innerHTML=`<div class="page-h"><h1>Checklist ASEC Toyota</h1>
+      <p>Abre o sistema de auditoria interna (mesmo login Supabase). Relatórios salvos e o cronograma alimentam automaticamente o gráfico de realizadas × planejadas neste dashboard.</p></div>
+      <div class="panel" style="text-align:center;padding:2rem">
+        <p style="margin-bottom:1.25rem;color:var(--muted);font-size:14px">O checklist roda em página separada e compartilha o banco (tabelas <code>auditorias</code> e <code>cronograma</code>).</p>
+        <a class="btn btn-g" href="index-asec.html" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none;padding:.85rem 1.6rem;font-size:1rem">Abrir Checklist / Relatório ASEC ↗</a>
+        <p style="margin-top:1rem;font-size:12px;color:var(--muted)">Dica: deixe as duas abas abertas. Ao salvar um relatório ou incluir data no cronograma, volte aqui e recarregue o Dashboard ASEC (ou faça logout/login) para atualizar os números.</p>
+      </div>`;
+  }
   else if(v==='metro-dash') main.innerHTML=renderMetroDash();
   else if(v==='metro-lista'){ main.innerHTML=renderMetroShell(); bindMetro(); }
 
@@ -2002,16 +2069,19 @@ function renderAsecDash(){
     );
   }
 
-  return `<div class="page-h"><h1>Dashboard ASEC Toyota</h1><p>Auditorias · NC · Assertividade · Dealer Evaluation</p></div>
+  return `<div class="page-h" style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:12px;justify-content:space-between">
+    <div><h1>Dashboard ASEC Toyota</h1><p>Auditorias · NC · Assertividade · Dealer Evaluation · dados live do checklist</p></div>
+    <button type="button" class="btn btn-g" id="btnAsecRefresh" style="flex-shrink:0">↻ Atualizar do Supabase</button>
+  </div>
   <div class="kpi-row">
-    <div class="kpi feat"><div class="l">Realizadas</div><div class="v">${real}</div><div class="s">no ano</div></div>
-    <div class="kpi"><div class="l">Planejadas</div><div class="v">${plan}</div><div class="s">no ano</div></div>
+    <div class="kpi feat"><div class="l">Realizadas</div><div class="v">${real}</div><div class="s">relatórios salvos</div></div>
+    <div class="kpi"><div class="l">Planejadas</div><div class="v">${plan}</div><div class="s">cronograma</div></div>
     <div class="kpi"><div class="l">% Cumprimento</div><div class="v">${pct}%</div><div class="s">real / plan</div></div>
     <div class="kpi"><div class="l">NC</div><div class="v">${ncTot}</div><div class="s">Matriz + Itajaí</div></div>
     <div class="kpi"><div class="l">Sugestões</div><div class="v">${sugTot}</div><div class="s">melhoria</div></div>
   </div>
   <div class="panel"><h3>Auditorias realizadas × planejadas</h3>
-    <p style="font-size:11px;color:var(--muted);margin:-4px 0 10px">Comparativo mensal (barras verticais)</p>
+    <p style="font-size:11px;color:var(--muted);margin:-4px 0 10px">Realizadas = relatórios em <code>auditorias</code> · Planejadas = datas em <code>cronograma</code> (ano atual)</p>
     ${vBarCompare(audRows)}</div>
   <div class="grid2">
     <div class="panel"><h3>NC × Sugestões — Matriz RS</h3>${vBarCompareNC(ncMatRows)}</div>
