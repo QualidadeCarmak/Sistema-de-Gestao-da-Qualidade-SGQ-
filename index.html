@@ -439,6 +439,91 @@ async function pushInstrumentoToCloud(row) {
   } catch (e) { console.warn("pushInstrumentoToCloud", e); }
 }
 
+async function pullAllFromCloud(){
+  if(!sessionStorage.getItem('sgq_access')) return false;
+  try{
+    const docs = await sbRest('GET','documents',{query:'select=*&order=codigo'});
+    const flux = await sbRest('GET','fluxogramas',{query:'select=*&order=area,processo'});
+    const tecs = await sbRest('GET','tecnicos',{query:'select=*&order=nome'});
+    const mods = await sbRest('GET','modulos_treino',{query:'select=*'});
+    const tmods = await sbRest('GET','tecnico_modulos',{query:'select=*'});
+    const inst = await sbRest('GET','instrumentos',{query:'select=*'});
+    const aud = await sbRest('GET','asec_auditorias_mes',{query:'select=*&order=mes'});
+    const nc = await sbRest('GET','asec_nc_mes',{query:'select=*'});
+    const dealer = await sbRest('GET','dealer_evaluation',{query:'select=*&order=mes'});
+
+    const modById = {};
+    (mods||[]).forEach(m=>{ modById[m.id]=m; });
+
+    const tmodByTec = {};
+    (tmods||[]).forEach(tm=>{
+      if(!tmodByTec[tm.tecnico_id]) tmodByTec[tm.tecnico_id]={};
+      const m = modById[tm.modulo_id];
+      if(m && m.nome) tmodByTec[tm.tecnico_id][m.nome]=tm.status;
+    });
+
+    if(docs && docs.length){
+      DB.docs = docs.map(d=>({
+        id: d.id || uid(),
+        codigo: d.codigo||'', tipo: d.tipo||'', titulo: d.titulo||'',
+        area: d.area||'', responsavel: d.responsavel||'', gestor: d.gestor||'',
+        controle: d.controle||'', revisao_atual: d.revisao_atual||'',
+        emissao: d.emissao||null, ultima: d.ultima||null, revisao: d.revisao||null,
+        criticidade: d.criticidade||'Média', frequencia: d.frequencia||null,
+        prioridade: d.prioridade||'', norma: d.norma||'', situacao: d.situacao||'Ativo',
+        obs: d.obs||''
+      }));
+    }
+    if(flux && flux.length){
+      DB.fluxos = flux.map(f=>({
+        id: f.id||uid(), area: f.area||'', processo: f.processo||'',
+        status: f.status||'Não Iniciado', obs: f.obs||''
+      }));
+    }
+    if(tecs && tecs.length){
+      DB.people = tecs.map(t=>({
+        id: t.id||uid(), nome: t.nome||'', regiao: t.regiao||'',
+        estado: t.estado||'', mods: tmodByTec[t.id]||{}
+      }));
+    }
+    if(inst && inst.length){
+      DB.instruments = inst.map(i=>({
+        id: i.id||uid(), equipamento: i.equipamento||'', tipo: i.tipo||'',
+        fabricante: i.fabricante||'', modelo: i.modelo||'', serie: i.serie||'',
+        setor: i.setor||'', responsavel: i.responsavel||'',
+        periodicidade: i.periodicidade||12, ultima: i.ultima||null,
+        situacao: i.situacao||'Ativo', emp: i.emp||'', obs: i.obs||''
+      }));
+    }
+    if(aud && aud.length){
+      if(!DB.asec) DB.asec={};
+      DB.asec.auditorias = aud.map(a=>({
+        mes: a.mes, realizadas: a.realizadas, planejadas: a.planejadas
+      }));
+    }
+    if(nc && nc.length){
+      if(!DB.asec) DB.asec={};
+      DB.asec.nc_matriz = nc.filter(x=>x.unidade==='Matriz').map(x=>({mes:x.mes,nc:x.nc,sug:x.sugestoes}));
+      DB.asec.nc_itajai = nc.filter(x=>x.unidade==='Itajai'||x.unidade==='Itajaí').map(x=>({mes:x.mes,nc:x.nc,sug:x.sugestoes}));
+    }
+    if(dealer && dealer.length){
+      if(!DB.asec) DB.asec={};
+      DB.asec.dealer = dealer.map(d=>({
+        dealer:d.dealer, mes:d.mes, geral:d.nota_geral, mandatoria:d.nota_mandatoria
+      }));
+    }
+    console.log('Supabase sync OK', {
+      docs:(DB.docs||[]).length, flux:(DB.fluxos||[]).length,
+      people:(DB.people||[]).length, inst:(DB.instruments||[]).length
+    });
+    return true;
+  }catch(e){
+    console.warn('pullAllFromCloud', e);
+    return false;
+  }
+}
+
+
 const FREQ_BY_CRIT={Alta:6,'Média':12,Media:12,Baixa:24};
 const MODULES_T=["STEP 1 TO/BT Módulo 1", "STEP 1 TO/BT Módulo 2", "STEP 1 TO/BT Módulo 3", "STEP 2 TO Módulo 1", "STEP 2 TO Módulo 2", "STEP 2 TO Módulo 3", "STEP 3 TO Módulo 1", "STEP 3 TO Módulo 2", "STEP 3 TO Módulo 3", "STEP 1 BT", "STEP 2 BT"];
 
@@ -586,9 +671,13 @@ async function doLogin(){
       sessionStorage.setItem('sgq_email', (user && user.email) || u);
       sessionStorage.setItem('sgq_access', access);
       err.classList.remove('show');
+      err.textContent='Sincronizando dados…';
+      err.classList.add('show');
+      loadDB();
+      await pullAllFromCloud();
+      err.classList.remove('show');
       document.getElementById('login').classList.add('hidden');
       document.getElementById('guia').classList.add('on');
-      loadDB();
       return;
     }
     // 2) Fallback local (dev)
@@ -1307,6 +1396,11 @@ if(sessionStorage.getItem('sgq_ok')==='1'){
   document.getElementById('login').classList.add('hidden');
   document.getElementById('guia').classList.add('on');
   loadDB();
+  if(sessionStorage.getItem('sgq_access')){
+    pullAllFromCloud().then(ok=>{
+      console.log('boot sync', ok);
+    }).catch(e=>console.warn(e));
+  }
 }
 </script>
 </body>
