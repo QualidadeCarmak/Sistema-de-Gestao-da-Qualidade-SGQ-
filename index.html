@@ -13,18 +13,21 @@
   --ok:#2F6B4F;--warn:#8A6B00;--bad:#C6483E;
   --top1:#032418;--top2:#06402B;--chip:#E8D5A3;
   --kpi-feat1:#06402B;--kpi-feat2:#0A5A3C;
+  --plan:#4A7A64;--plan-2:#2F5A48;
 }
 [data-theme="navy"]{
   --navy:#0B1D36;--navy-2:#132F4C;--page:#E8EDF3;--tint:#D8E0EA;--card:#F0F4F9;--line:#C5D0DC;
   --ink:#0E1520;--ink-2:#3A4556;--muted:#5A6575;
   --top1:#061018;--top2:#0B1D36;
   --kpi-feat1:#0B1D36;--kpi-feat2:#132F4C;
+  --plan:#4A6FA5;--plan-2:#2C4A7A;
 }
 [data-theme="grafite"]{
   --navy:#1A1A1A;--navy-2:#2D2D2D;--page:#EDECE8;--tint:#E2E0DA;--card:#F5F4F1;--line:#D0CDC4;
   --ink:#141414;--ink-2:#4A4A45;--muted:#6B6B63;
   --top1:#111;--top2:#1A1A1A;
   --kpi-feat1:#1A1A1A;--kpi-feat2:#2D2D2D;
+  --plan:#6B6B63;--plan-2:#4A4A45;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Inter,system-ui,sans-serif;background:var(--page);color:var(--ink);min-height:100vh}
@@ -128,7 +131,7 @@ button,input,select,textarea{font-family:inherit}
 .fg input,.fg select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;min-width:120px}
 .btn{appearance:none;border:none;border-radius:8px;padding:8px 14px;font-weight:600;font-size:13px;cursor:pointer}
 .btn-p{background:var(--navy);color:#fff}
-.btn-g{background:linear-gradient(135deg,var(--gold),#a3812f);color:#042e1f}
+.btn-g{background:linear-gradient(135deg,var(--accent,#D4B56A),var(--gold,#C4A35A));color:var(--top1,#042e1f)}
 .btn-s{background:var(--tint);color:var(--ink-2);border:1px solid var(--line)}
 .btn-d{background:#f5d6da;color:var(--bad)}
 .table-wrap{overflow:auto;max-height:58vh;border:1px solid var(--line);border-radius:12px;background:var(--card)}
@@ -261,7 +264,7 @@ tr:hover td{background:var(--tint)}
 .vbar-pair{display:flex;align-items:flex-end;gap:3px;width:100%;height:100%;justify-content:center}
 .vbar{width:42%;border-radius:4px 4px 0 0;min-height:2px;transition:height .2s}
 .vbar.real{background:linear-gradient(180deg,var(--gold,#C4A35A),var(--navy,#1a1a1a))}
-.vbar.plan{background:linear-gradient(180deg,#5B7C99,#3A556E)}
+.vbar.plan{background:linear-gradient(180deg,var(--plan,#4A7A64),var(--plan-2,#2F5A48))}
 .vbar-lab{font-size:10px;color:var(--muted);margin-top:6px;text-align:center}
 .vbar-legend{display:flex;gap:14px;margin-top:10px;font-size:11px;color:var(--muted)}
 .vbar-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
@@ -1930,7 +1933,7 @@ function vBarCompare(rows){
       <div class="vbar plan" style="height:${hb}%" title="Planejadas: ${r.b}"></div>
     </div><div class="vbar-lab">${esc(r.l)}</div></div>`;
   }).join('');
-  return `<div class="vbar-wrap">${cols}</div><div class="vbar-legend"><span><i style="background:linear-gradient(180deg,#C4A35A,#1a1a1a)"></i>Realizadas</span><span><i style="background:linear-gradient(180deg,#5B7C99,#3A556E)"></i>Planejadas</span></div>`;
+  return `<div class="vbar-wrap">${cols}</div><div class="vbar-legend"><span><i style="background:linear-gradient(180deg,var(--gold,#C4A35A),var(--navy,#1a1a1a))"></i>Realizadas</span><span><i style="background:linear-gradient(180deg,var(--plan,#4A7A64),var(--plan-2,#2F5A48))"></i>Planejadas</span></div>`;
 }
 function vBarCompareNC(rows){
   if(!rows||!rows.length) return '<p style="color:var(--muted);font-size:13px">Sem dados</p>';
