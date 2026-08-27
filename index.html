@@ -159,6 +159,8 @@ tr:hover td{background:var(--tint)}
 .alert{padding:11px 13px;border-radius:10px;margin-bottom:10px;font-size:13px}
 .alert.warn{background:#F5EBC0;border:1px solid #e0c56a;color:#8a6b00}
 .alert.ok{background:#D4EDDF;border:1px solid #b8e0cc;color:var(--ok)}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:1000px){.grid3{grid-template-columns:1fr}}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:800px){.grid2{grid-template-columns:1fr}}
 .foot{text-align:center;padding:16px;font-size:11px;color:var(--muted)}
@@ -181,6 +183,32 @@ tr:hover td{background:var(--tint)}
 .map-legend{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px;font-size:11px;color:var(--muted)}
 .map-legend span{display:inline-flex;align-items:center;gap:4px}
 .map-legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+
+.donut-row{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.donut{width:140px;height:140px;border-radius:50%;flex-shrink:0;position:relative}
+.donut::after{content:'';position:absolute;inset:28%;border-radius:50%;background:var(--card,#1a2332)}
+.donut-leg{flex:1;min-width:120px}
+.donut-leg .item{display:flex;align-items:center;gap:8px;font-size:12px;margin:6px 0;color:var(--text)}
+.donut-leg .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.donut-note{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(255,255,255,.12);font-size:11px;color:var(--muted);line-height:1.5}
+.donut-note strong{color:var(--gold,#C4A35A);display:block;font-size:12px}
+.stack-row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.stack-row .lab{width:130px;font-size:11px;text-align:right;color:var(--muted);flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stack-track{flex:1;height:18px;border-radius:6px;overflow:hidden;display:flex;background:rgba(255,255,255,.06)}
+.stack-track span{height:100%;display:block}
+.stack-row .num{width:28px;font-size:11px;font-weight:600;color:var(--text)}
+.stack-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:11px;color:var(--muted)}
+.stack-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.pend-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.pend-tbl th{background:var(--navy,#0d3b2e);color:#fff;padding:8px 10px;text-align:left;font-weight:600;position:sticky;top:0}
+.pend-tbl td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06)}
+.pend-tbl tr:hover td{background:rgba(255,255,255,.03)}
+.pend-scroll{max-height:320px;overflow:auto;border-radius:10px}
+.badge-st{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:600}
+.badge-st.bad{background:rgba(220,80,80,.2);color:#f5a0a0}
+.badge-st.warn{background:rgba(230,160,50,.2);color:#f0c878}
+.badge-st.ok{background:rgba(80,180,120,.2);color:#8fd4a8}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -783,38 +811,304 @@ function showView(v){
 }
 
 /* ===== SGQ DASH ===== */
+
+function countMap(arr, keyFn){
+  const m={};
+  arr.forEach(x=>{const k=keyFn(x)||'—'; m[k]=(m[k]||0)+1});
+  return m;
+}
+function donutChart(parts, colors){
+  const total=parts.reduce((s,p)=>s+p.v,0)||1;
+  let acc=0;
+  const segs=parts.map((p,i)=>{
+    const start=acc; acc+=100*p.v/total;
+    return `${colors[i%colors.length]} ${start}% ${acc}%`;
+  }).join(',');
+  const leg=parts.map((p,i)=>`<div class="item"><span class="dot" style="background:${colors[i%colors.length]}"></span>${esc(p.l)} <strong style="margin-left:auto">${p.v}</strong></div>`).join('');
+  return `<div class="donut-row"><div class="donut" style="background:conic-gradient(${segs})"></div><div class="donut-leg">${leg}</div></div>`;
+}
+function hBarChart(items, maxV){
+  const max=maxV||Math.max(1,...items.map(i=>i.v));
+  return items.map(i=>{
+    const pct=Math.round(100*i.v/max);
+    const grad=i.grad||'linear-gradient(90deg,#0d5c4a,#c4a35a)';
+    return `<div class="bar-row"><div class="lab" title="${esc(i.l)}">${esc(i.l)}</div><div class="track"><div class="fill" style="width:${pct}%;background:${grad}"></div></div><div class="num">${i.v}</div></div>`;
+  }).join('');
+}
+function stackRiskBars(areas){
+  // areas: [{l, total, ven, d30, d90, ok}]
+  return areas.map(a=>{
+    const t=a.total||1;
+    const w=(n)=>Math.max(0,100*n/t);
+    return `<div class="stack-row">
+      <div class="lab" title="${esc(a.l)}">${esc(a.l)}</div>
+      <div class="stack-track">
+        <span style="width:${w(a.ven)}%;background:#c44"></span>
+        <span style="width:${w(a.d30)}%;background:#e08a30"></span>
+        <span style="width:${w(a.d90)}%;background:#d4a84b"></span>
+        <span style="width:${w(a.ok)}%;background:#c4a35a"></span>
+      </div>
+      <div class="num">${a.total}</div>
+    </div>`;
+  }).join('')+`<div class="stack-legend">
+    <span><i style="background:#c44"></i>Vencido</span>
+    <span><i style="background:#e08a30"></i>Vence em 30 dias</span>
+    <span><i style="background:#d4a84b"></i>Vence 90 dias</span>
+    <span><i style="background:#c4a35a"></i>Em dia</span>
+  </div>`;
+}
+
 function renderSgqDash(){
   const docs=DB.docs.map(enrichDoc);
-  const flux=DB.fluxos;
+  const flux=DB.fluxos||[];
+
+  /* --- documentos: cards --- */
+  const ativos=docs.filter(d=>!/obsoleto|cancelado/i.test(String(d.situacao||'')) && d.st!=='Obsoleto' && d.st!=='Cancelado');
+  const vencidos=docs.filter(d=>d.st==='Vencido').length;
+  const d30=docs.filter(d=>d.st==='Vence em 30 dias').length;
+  const d90=docs.filter(d=>d.st==='Vence em 90 dias').length;
+  const proxVenc=d30+d90; // próximo vencimento (até 90 dias)
+  const obsoletos=docs.filter(d=>/obsoleto/i.test(String(d.situacao||'')) || d.st==='Obsoleto').length;
+  const emDia=docs.filter(d=>d.st==='Em dia').length;
+  // Índice de conformidade: ativos em dia / ativos com prazo (exclui sem data)
+  const ativosComPrazo=ativos.filter(d=>d.st && d.st!=='Sem data');
+  const confBase=ativosComPrazo.length||1;
+  const confOk=ativosComPrazo.filter(d=>d.st==='Em dia').length;
+  const indiceConf=Math.round(100*confOk/confBase);
+
+  /* --- fluxogramas: cards --- */
+  const fTot=flux.length;
+  const fFin=flux.filter(f=>f.status==='Finalizado').length;
+  const fPend=fTot-fFin;
+  const fPct=fTot?Math.round(100*fFin/fTot):0;
+
+  /* --- docs charts --- */
+  const byArea={};
+  docs.forEach(d=>{const a=d.area||'—';byArea[a]=(byArea[a]||0)+1});
+  const areaBars=Object.entries(byArea).sort((a,b)=>b[1]-a[1]).map(([l,v])=>({l,v}));
+
+  const byTipo={};
+  docs.forEach(d=>{const t=(d.tipo||'Outro').toUpperCase();byTipo[t]=(byTipo[t]||0)+1});
+  const tipoParts=Object.entries(byTipo).sort((a,b)=>b[1]-a[1]).map(([l,v])=>({l,v}));
+  const tipoColors=['#1a1a1a','#c4a35a','#a88b4a','#e8d5a3','#6b8f71','#4a6fa5'];
+  const tipoTop=tipoParts[0];
+  const altaByTipo={};
+  docs.filter(d=>/alta/i.test(d.criticidade||'')).forEach(d=>{
+    const t=(d.tipo||'Outro').toUpperCase(); altaByTipo[t]=(altaByTipo[t]||0)+1;
+  });
+  const altaTop=Object.entries(altaByTipo).sort((a,b)=>b[1]-a[1])[0];
+
+  const byCrit={};
+  docs.forEach(d=>{const c=d.criticidade||'—';byCrit[c]=(byCrit[c]||0)+1});
+  const critOrder=['Baixa','Média','Media','Alta'];
+  const critParts=critOrder.filter(c=>byCrit[c]).map(c=>({l:c==='Media'?'Média':c,v:byCrit[c]}));
+  Object.keys(byCrit).forEach(c=>{if(!critOrder.includes(c)) critParts.push({l:c,v:byCrit[c]})});
+  const critColors=['#c4a35a','#e0c56e','#c44'];
+
+  const bySit={};
+  docs.forEach(d=>{const s=d.situacao||'Ativo';bySit[s]=(bySit[s]||0)+1});
+  const sitParts=Object.entries(bySit).map(([l,v])=>({l,v}));
+  const sitColors=['#c4a35a','#8a9bb0','#4a5568','#666'];
+
   const counts={};
   docs.forEach(d=>{counts[d.st]=(counts[d.st]||0)+1});
-  const stOrder=['Em dia','Vence em 90 dias','Vence em 30 dias','Vencido','Sem data','Obsoleto'];
-  const stCls={'Em dia':'ok','Vence em 90 dias':'warn','Vence em 30 dias':'warn','Vencido':'bad','Sem data':'warn','Obsoleto':'off'};
-  const barDocs=stOrder.filter(s=>counts[s]).map(s=>({l:s,v:counts[s],cls:stCls[s]||''}));
+  const stOrder=['Vencido','Vence em 30 dias','Vence em 90 dias','Em dia','Obsoleto','Cancelado','Sem data'];
+  const stColor={'Vencido':'#c44','Vence em 30 dias':'#e08a30','Vence em 90 dias':'#d4a84b','Em dia':'#c4a35a','Obsoleto':'#888','Cancelado':'#555','Sem data':'#666'};
+  const barStatus=stOrder.filter(s=>counts[s]).map(s=>({l:s,v:counts[s],grad:`linear-gradient(90deg,${stColor[s]},${stColor[s]})`}));
+
+  const risk={};
+  docs.forEach(d=>{
+    const a=d.area||'—';
+    if(!risk[a]) risk[a]={l:a,total:0,ven:0,d30:0,d90:0,ok:0};
+    risk[a].total++;
+    if(d.st==='Vencido') risk[a].ven++;
+    else if(d.st==='Vence em 30 dias') risk[a].d30++;
+    else if(d.st==='Vence em 90 dias') risk[a].d90++;
+    else if(d.st==='Em dia') risk[a].ok++;
+  });
+  const riskArr=Object.values(risk).sort((a,b)=>(b.ven+b.d30)-(a.ven+a.d30)||b.total-a.total);
+
+  const pend=docs.filter(d=>{
+    if(/obsoleto|cancelado/i.test(String(d.situacao||''))) return false;
+    return d.st==='Vencido'||d.st==='Vence em 30 dias';
+  }).map(d=>{
+    let prazo='—';
+    if(d.revisao){
+      const days=daysUntil(d.revisao);
+      if(days!==null){
+        if(days<0) prazo=Math.abs(days)+'d em atraso';
+        else prazo=days+'d restantes';
+      }
+    }
+    return {...d,prazo,urg:(d.st==='Vencido'?0:1)};
+  }).sort((a,b)=>{
+    if(a.urg!==b.urg) return a.urg-b.urg;
+    const da=daysUntil(a.revisao), db=daysUntil(b.revisao);
+    return (da??9999)-(db??9999);
+  }).slice(0,25);
+
+  const pendRows=pend.map(d=>`<tr>
+    <td><code>${esc(d.codigo)}</code></td>
+    <td>${esc(d.titulo)}</td>
+    <td>${esc(d.area||'—')}</td>
+    <td>${esc(d.gestor||'—')}</td>
+    <td><span class="badge-st ${d.st==='Vencido'?'bad':'warn'}">${esc(d.st)}</span></td>
+    <td>${esc(d.prazo)}</td>
+  </tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--muted)">Nenhuma pendência urgente</td></tr>';
+
+  /* --- flux charts --- */
   const fCounts={};
   flux.forEach(f=>{fCounts[f.status]=(fCounts[f.status]||0)+1});
   const fOrder=['Finalizado','Em Andamento','Aguardando Revisão','Não Iniciado'];
-  const fCls={'Finalizado':'ok','Em Andamento':'warn','Aguardando Revisão':'warn','Não Iniciado':'bad'};
-  const barFlux=fOrder.filter(s=>fCounts[s]).map(s=>({l:s,v:fCounts[s],cls:fCls[s]||''}));
-  const byArea={};
-  flux.forEach(f=>{if(!byArea[f.area])byArea[f.area]={t:0,ok:0};byArea[f.area].t++;if(f.status==='Finalizado')byArea[f.area].ok++});
-  const areaArr=Object.entries(byArea).map(([a,x])=>({l:a.length>18?a.slice(0,16)+'…':a,v:Math.round(100*x.ok/x.t),cls:x.ok/x.t>=.9?'ok':x.ok/x.t>=.5?'warn':'bad'})).sort((a,b)=>b.v-a.v).slice(0,8);
-  const ven=counts['Vencido']||0,d30=counts['Vence em 30 dias']||0,ok=counts['Em dia']||0;
-  const fin=fCounts['Finalizado']||0,pct=flux.length?Math.round(100*fin/flux.length):0;
-  return `<div class="page-h"><h1>Dashboard SGQ</h1><p>${docs.length} documentos · ${flux.length} fluxogramas</p></div>
+  const fColors={'Finalizado':'#4caf7a','Em Andamento':'#e0c56e','Aguardando Revisão':'#e08a30','Não Iniciado':'#c44'};
+  const barFlux=fOrder.filter(s=>fCounts[s]).map(s=>({l:s,v:fCounts[s],grad:`linear-gradient(90deg,${fColors[s]},${fColors[s]})`}));
+  const fDonut=fOrder.filter(s=>fCounts[s]).map(s=>({l:s,v:fCounts[s]}));
+  const fDonutColors=fOrder.filter(s=>fCounts[s]).map(s=>fColors[s]);
+
+  const byFArea={};
+  flux.forEach(f=>{
+    if(!byFArea[f.area]) byFArea[f.area]={t:0,ok:0};
+    byFArea[f.area].t++;
+    if(f.status==='Finalizado') byFArea[f.area].ok++;
+  });
+  const fluxArea=Object.entries(byFArea).map(([a,x])=>({
+    l:a, v:Math.round(100*x.ok/x.t),
+    grad:x.ok/x.t>=.9?'linear-gradient(90deg,#0d5c4a,#4caf7a)':x.ok/x.t>=.5?'linear-gradient(90deg,#8a6a20,#c4a35a)':'linear-gradient(90deg,#8a2020,#c44)'
+  })).sort((a,b)=>b.v-a.v);
+
+  /* --- relação mapeamento × docs vencidos por área --- */
+  const allAreas=new Set([...Object.keys(byArea),...Object.keys(byFArea)]);
+  const relRows=[...allAreas].map(a=>{
+    const docsArea=docs.filter(d=>(d.area||'—')===a);
+    const venA=docsArea.filter(d=>d.st==='Vencido').length;
+    const fa=byFArea[a]||{t:0,ok:0};
+    const pctMap=fa.t?Math.round(100*fa.ok/fa.t):null;
+    return {area:a, docs:docsArea.length, vencidos:venA, flux:fa.t, fin:fa.ok, pct:pctMap};
+  }).filter(r=>r.docs||r.flux).sort((a,b)=>b.vencidos-a.vencidos||(a.pct??999)-(b.pct??999));
+
+  const relTable=relRows.map(r=>{
+    const pctTxt=r.pct===null?'—':r.pct+'%';
+    const pctCls=r.pct===null?'':(r.pct>=90?'ok':r.pct>=50?'warn':'bad');
+    return `<tr>
+      <td>${esc(r.area)}</td>
+      <td style="text-align:center">${r.docs}</td>
+      <td style="text-align:center"><span class="badge-st ${r.vencidos?'bad':'ok'}">${r.vencidos}</span></td>
+      <td style="text-align:center">${r.flux}</td>
+      <td style="text-align:center">${r.fin}</td>
+      <td style="text-align:center"><span class="badge-st ${pctCls}">${pctTxt}</span></td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--muted)">Sem dados</td></tr>';
+
+  return `<div class="page-h"><h1>Dashboard SGQ</h1><p>${docs.length} documentos · ${fTot} fluxogramas · sincronizado com Supabase</p></div>
+
+  <h3 style="margin:8px 0 10px;font-size:14px;color:var(--gold,#C4A35A);letter-spacing:.04em">DOCUMENTOS</h3>
   <div class="kpi-row">
-    <div class="kpi feat"><div class="l">Documentos</div><div class="v">${docs.length}</div><div class="s">lista mestra</div></div>
-    <div class="kpi"><div class="l">Em dia</div><div class="v">${ok}</div><div class="s">revisão ok</div></div>
-    <div class="kpi"><div class="l">30 dias</div><div class="v">${d30}</div><div class="s">atenção</div></div>
-    <div class="kpi"><div class="l">Vencidos</div><div class="v">${ven}</div><div class="s">ação</div></div>
-    <div class="kpi feat"><div class="l">Fluxogramas</div><div class="v">${pct}%</div><div class="s">${fin}/${flux.length} finalizados</div></div>
+    <div class="kpi feat"><div class="l">Total documentos</div><div class="v">${docs.length}</div><div class="s">lista mestra</div></div>
+    <div class="kpi"><div class="l">Ativos</div><div class="v">${ativos.length}</div><div class="s">em vigência</div></div>
+    <div class="kpi"><div class="l">Vencidos</div><div class="v">${vencidos}</div><div class="s">revisão atrasada</div></div>
+    <div class="kpi"><div class="l">Próx. venc. (90d)</div><div class="v">${proxVenc}</div><div class="s">${d30} em 30d · ${d90} em 90d</div></div>
+    <div class="kpi"><div class="l">Obsoletos</div><div class="v">${obsoletos}</div><div class="s">fora de uso</div></div>
+    <div class="kpi feat"><div class="l">Índice conformidade</div><div class="v">${indiceConf}%</div><div class="s">${confOk}/${ativosComPrazo.length} ativos em dia</div></div>
   </div>
+
   <div class="grid2">
-    <div class="panel"><h3>Status dos documentos</h3>${barChart(barDocs)}</div>
-    <div class="panel"><h3>Status dos fluxogramas</h3>${barChart(barFlux)}</div>
+    <div class="panel">
+      <h3>Documentos por Área</h3>
+      <p style="font-size:11px;color:var(--muted);margin:-4px 0 10px">Quantidade de documentos controlados, por área responsável</p>
+      ${hBarChart(areaBars)}
+    </div>
+    <div class="panel">
+      <h3>Documentos por Tipo</h3>
+      <p style="font-size:11px;color:var(--muted);margin:-4px 0 10px">PQ · PP · RQ · POP</p>
+      ${donutChart(tipoParts, tipoColors)}
+      <div class="donut-note">
+        <strong>TIPO MAIS NUMEROSO</strong>
+        ${tipoTop?esc(tipoTop.l)+' ('+tipoTop.v+' docs · '+Math.round(100*tipoTop.v/Math.max(1,docs.length))+'%)':'—'}
+        <strong style="margin-top:8px">MAIOR CONCENTRAÇÃO DE CRITICIDADE ALTA</strong>
+        ${altaTop?esc(altaTop[0])+' ('+altaTop[1]+' doc'+(altaTop[1]>1?'s':'')+')':'—'}
+      </div>
+    </div>
   </div>
-  <div class="panel"><h3>% Fluxogramas finalizados por área (top 8)</h3>${barChart(areaArr,100)}</div>`;
+
+  <div class="grid3">
+    <div class="panel">
+      <h3>Por Criticidade</h3>
+      <p style="font-size:11px;color:var(--muted);margin:-4px 0 10px">Alta · Média · Baixa</p>
+      ${donutChart(critParts, critColors)}
+    </div>
+    <div class="panel">
+      <h3>Por Situação</h3>
+      <p style="font-size:11px;color:var(--muted);margin:-4px 0 10px">Ativo · Obsoleto · Cancelado</p>
+      ${donutChart(sitParts, sitColors)}
+    </div>
+    <div class="panel">
+      <h3>Por Status de Revisão</h3>
+      <p style="font-size:11px;color:var(--muted);margin:-4px 0 10px">Situação de prazo de cada documento</p>
+      ${hBarChart(barStatus)}
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Radar de risco por área</h3>
+    <p style="font-size:11px;color:var(--muted);margin:-4px 0 10px">Proporção de documentos vencidos, próximos do vencimento e em dia — quanto mais vermelho, maior a urgência</p>
+    ${stackRiskBars(riskArr)}
+  </div>
+
+  <div class="panel">
+    <h3>Top pendências</h3>
+    <p style="font-size:11px;color:var(--muted);margin:-4px 0 10px">Documentos ativos vencidos ou com vencimento em até 30 dias, ordenados por urgência</p>
+    <div class="pend-scroll">
+      <table class="pend-tbl">
+        <thead><tr><th>Código</th><th>Título</th><th>Área</th><th>Gestor</th><th>Status</th><th>Prazo</th></tr></thead>
+        <tbody>${pendRows}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <h3 style="margin:22px 0 10px;font-size:14px;color:var(--gold,#C4A35A);letter-spacing:.04em">FLUXOGRAMAS</h3>
+  <div class="kpi-row">
+    <div class="kpi feat"><div class="l">Processos mapeados</div><div class="v">${fTot}</div><div class="s">base de fluxogramas</div></div>
+    <div class="kpi feat"><div class="l">% mapeamento concluído</div><div class="v">${fPct}%</div><div class="s">finalizados / total</div></div>
+    <div class="kpi"><div class="l">Finalizados</div><div class="v">${fFin}</div><div class="s">concluídos</div></div>
+    <div class="kpi"><div class="l">Pendentes</div><div class="v">${fPend}</div><div class="s">em aberto</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <h3>Fluxogramas por status</h3>
+      <p style="font-size:11px;color:var(--muted);margin:-4px 0 10px">Distribuição do mapeamento</p>
+      ${donutChart(fDonut.length?fDonut:[{l:'Sem dados',v:1}], fDonutColors.length?fDonutColors:['#666'])}
+      <div style="margin-top:12px">${hBarChart(barFlux.length?barFlux:[{l:'Sem dados',v:0}])}</div>
+    </div>
+    <div class="panel">
+      <h3>Mapeamento finalizado por área</h3>
+      <p style="font-size:11px;color:var(--muted);margin:-4px 0 10px">% consolidado · finalizados / total da área</p>
+      ${hBarChart(fluxArea.length?fluxArea:[{l:'Sem dados',v:0}],100)}
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Relação: mapeamento × documentos vencidos</h3>
+    <p style="font-size:11px;color:var(--muted);margin:-4px 0 10px">Por área — cruza maturidade do mapeamento com risco documental (vencidos)</p>
+    <div class="pend-scroll">
+      <table class="pend-tbl">
+        <thead>
+          <tr>
+            <th>Área</th>
+            <th style="text-align:center">Docs</th>
+            <th style="text-align:center">Docs vencidos</th>
+            <th style="text-align:center">Fluxos</th>
+            <th style="text-align:center">Finalizados</th>
+            <th style="text-align:center">% mapeado</th>
+          </tr>
+        </thead>
+        <tbody>${relTable}</tbody>
+      </table>
+    </div>
+  </div>`;
 }
+
+
 
 /* ===== DOCS CRUD ===== */
 function renderDocsShell(){
