@@ -1689,59 +1689,6 @@ function closeLightbox() {
   document.getElementById("lightbox").classList.remove("show");
 }
 
-
-function unidadeFromDealer(dealer) {
-  const d = String(dealer || "");
-  if (/itaj/i.test(d)) return "Itajai";
-  if (/matriz|leopoldo|s[aã]o leopoldo/i.test(d)) return "Matriz";
-  if (/campo grande/i.test(d)) return "Campo Grande";
-  return d.trim() || "Matriz";
-}
-function setorFromArea(areaKey) {
-  const map = { GP:"GP", RH:"GP", Seg:"Segurança", Pos:"Pós Vendas", Ofi:"Oficina", Alm:"Almoxarifado" };
-  return map[areaKey] || (A[areaKey] && A[areaKey].n) || areaKey;
-}
-function mesPtFromDate(iso) {
-  const MES_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-  if (!iso) return MES_PT[new Date().getMonth()];
-  const m = String(iso).match(/^(\d{4})-(\d{2})/);
-  if (m) return MES_PT[parseInt(m[2],10)-1] || MES_PT[new Date().getMonth()];
-  const d = new Date(iso);
-  return !isNaN(d) ? MES_PT[d.getMonth()] : MES_PT[new Date().getMonth()];
-}
-async function pushAssertividadeFromReport({ area, dealer, auditDate, scorePct }) {
-  if (scorePct == null || isNaN(Number(scorePct))) return;
-  const unidade = unidadeFromDealer(dealer);
-  const setor = setorFromArea(area);
-  const mes = mesPtFromDate(auditDate);
-  let nota = Number(scorePct);
-  if (nota > 1) nota = nota / 100;
-  if (nota < 0) nota = 0;
-  if (nota > 1) nota = 1;
-  const payload = { unidade, setor, mes, nota };
-  if (supabase) {
-    const up = await supabase.from("asec_assertividade").upsert(payload, { onConflict: "unidade,setor,mes" });
-    if (up.error) {
-      const q = await supabase.from("asec_assertividade").select("id").eq("unidade", unidade).eq("setor", setor).eq("mes", mes).maybeSingle();
-      if (q.data && q.data.id) {
-        const { error } = await supabase.from("asec_assertividade").update({ nota }).eq("id", q.data.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("asec_assertividade").insert(payload);
-        if (error) throw error;
-      }
-    }
-  } else {
-    const rows = await restQuery("/rest/v1/asec_assertividade?unidade=eq." + encodeURIComponent(unidade) + "&setor=eq." + encodeURIComponent(setor) + "&mes=eq." + encodeURIComponent(mes) + "&select=id");
-    if (rows && rows[0] && rows[0].id) {
-      await restQuery("/rest/v1/asec_assertividade?id=eq." + encodeURIComponent(rows[0].id), { method: "PATCH", body: { nota } });
-    } else {
-      await restQuery("/rest/v1/asec_assertividade", { method: "POST", body: payload });
-    }
-  }
-  console.log("assertividade OK", payload);
-}
-
 function calc(k) {
   const qs = A[k].q;
   let an = 0, ok = 0;
@@ -1871,25 +1818,28 @@ async function saveToHistory() {
       if (editingHistoryId) {
         const { error } = await supabase.from("auditorias").update(payload).eq("id", editingHistoryId);
         if (error) throw error;
-        try { await pushAssertividadeFromReport({ area: payload.area, dealer: payload.dealer, auditDate: payload.audit_date, scorePct: payload.score }); } catch (ae) { console.warn("assertividade", ae); }
-        await clearDraft(); alert("Relatório atualizado! Assertividade registrada no histórico.");
+        await clearDraft(); alert("Relatório atualizado!");
       } else {
         const { data, error } = await supabase.from("auditorias").insert(payload).select("id").single();
         if (error) throw error;
         editingHistoryId = data.id;
-        try { await pushAssertividadeFromReport({ area: payload.area, dealer: payload.dealer, auditDate: payload.audit_date, scorePct: payload.score }); } catch (ae) { console.warn("assertividade", ae); }
-        await clearDraft(); alert("Relatório salvo no histórico! Assertividade registrada.");
+        await clearDraft(); alert("Relatório salvo no histórico!");
       }
     } else {
       if (editingHistoryId) {
-        await restQuery("/rest/v1/auditorias?id=eq." + encodeURIComponent(editingHistoryId), { method: "PATCH", body: payload });
-        try { await pushAssertividadeFromReport({ area: payload.area, dealer: payload.dealer, auditDate: payload.audit_date, scorePct: payload.score }); } catch (ae) { console.warn("assertividade", ae); }
-        await clearDraft(); alert("Relatório atualizado! Assertividade registrada no histórico.");
+        await restQuery("/rest/v1/auditorias?id=eq." + encodeURIComponent(editingHistoryId), {
+          method: "PATCH",
+          body: payload
+        });
+        await clearDraft(); alert("Relatório atualizado!");
       } else {
-        var rows = await restQuery("/rest/v1/auditorias", { method: "POST", body: payload, prefer: "return=representation" });
+        var rows = await restQuery("/rest/v1/auditorias", {
+          method: "POST",
+          body: payload,
+          prefer: "return=representation"
+        });
         if (rows && rows[0] && rows[0].id) editingHistoryId = rows[0].id;
-        try { await pushAssertividadeFromReport({ area: payload.area, dealer: payload.dealer, auditDate: payload.audit_date, scorePct: payload.score }); } catch (ae) { console.warn("assertividade", ae); }
-        await clearDraft(); alert("Relatório salvo no histórico! Assertividade registrada.");
+        await clearDraft(); alert("Relatório salvo no histórico!");
       }
     }
   } catch (e) {
