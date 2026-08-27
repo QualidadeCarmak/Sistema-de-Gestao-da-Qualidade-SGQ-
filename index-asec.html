@@ -701,9 +701,9 @@ function canAccessArea(areaKey) {
 }
 </script>
 <script>
-const ICONS = {RH:"👥",Seg:"🛡️",Pos:"🔧",Ofi:"🏭",Alm:"📦"};
+const ICONS = {GP:"📈",Seg:"🛡️",Pos:"🔧",Ofi:"🏭",Alm:"📦"};
 const A = {
-RH:{n:"Recursos Humanos",q:[
+GP:{n:"Gente & Performance",q:[
 {i:"Q1-1",t:"O dealer / filial possui organograma para todos os membros do departamento de peças e serviços e há descrição das funções de cada cargo mencionado no organograma?",g:"Verifique o organograma e as descrições das funções. Analise se estão atualizados e se existe política de atualização.",m:0,e:0},
 {i:"Q2-1",t:"Existe um mapa de habilidades para todos os técnicos e os treinamentos são planejados baseado neste mapa de habilidades?",g:"(Evidenciável)",m:0,e:1},
 {i:"Q2-2",t:"Existe um programa motivacional para estimular os técnicos a aperfeiçoar suas habilidades técnicas através de treinamentos?",g:"Programa de incentivos com regras claras, compartilhado e baseado na melhoria de conhecimento/habilidades.",m:0,e:0}
@@ -843,7 +843,7 @@ Alm:{n:"Almoxarifado",q:[
 ]}
 };
 const DESC = {
-  RH: "Organograma, mapa de habilidades e programas motivacionais",
+  GP: "Organograma, mapa de habilidades e programas motivacionais",
   Seg: "Segurança do trabalho, EPIs, meio ambiente e prevenção de acidentes",
   Pos: "Atendimento, ordens de serviço, contratos e satisfação do cliente",
   Ofi: "Organização, limpeza, ferramentas e infraestrutura da oficina",
@@ -1065,17 +1065,17 @@ window.addEventListener("pagehide", () => { saveDraftNow(); });
 /* ===================== Cronograma ===================== */
 const FOCAIS = {
   "Matriz - São Leopoldo RS": {
-    RH: "Siluana Scharlau", Seg: "Thais Raupp", Pos: "Vagner Dutra",
+    GP: "Siluana Scharlau", Seg: "Thais Raupp", Pos: "Vagner Dutra",
     Ofi: "Nicolas Bayer", Alm: "Julio Correa"
   },
   "Filial - Itajaí SC": {
-    RH: "Siluana Scharlau", Seg: "Vitor Beulke", Pos: "Luis Henrique",
+    GP: "Siluana Scharlau", Seg: "Vitor Beulke", Pos: "Luis Henrique",
     Ofi: "Vitor Beulke", Alm: "Juliana Tasso"
   }
 };
 const DEALERS_CRONO = ["Matriz - São Leopoldo RS", "Filial - Itajaí SC"];
 const AREA_COLORS = {
-  RH: "#2F6B9A",
+  GP: "#2F6B9A",
   Seg: "#C6483E",
   Pos: "#6B4C9A",
   Ofi: "#1F7A5C",
