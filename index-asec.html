@@ -1,0 +1,2460 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checklist Auditoria Interna ASEC - Carmak</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="./supabase.min.js"></script>
+<style>
+:root{
+  --p:#06402b;
+  --pd:#042e1f;
+  --pl:#0a5c3c;
+  --gold:#c8a24d;
+  --gold-d:#a3812f;
+  --gold-lt:#f3e4bb;
+  --s:#1f7a5c;
+  --d:#a4344a;
+  --bg:#f2f4f8;
+  --c:#fff;
+  --b:#dde1ea;
+  --t:#152238;
+  --m:#606c85;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--t);line-height:1.5;min-height:100vh}
+header{background:linear-gradient(135deg,var(--p),var(--pd));color:#fff;padding:1rem 1.5rem;box-shadow:0 2px 16px rgba(4,46,31,.4);position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;border-bottom:3px solid var(--gold)}
+header img.logo{height:38px;width:auto}
+header .titles h1{font-size:1.25rem;font-weight:700;letter-spacing:.2px}
+header .titles p{font-size:.85rem;color:var(--gold-lt);margin-top:.15rem;letter-spacing:.3px}
+.nav{display:flex;gap:.5rem;margin-left:auto;align-items:center;flex-wrap:wrap}
+.nav button{background:rgba(255,255,255,.08);border:1px solid rgba(200,162,77,.4);color:#fff;padding:.45rem 1rem;border-radius:8px;font-weight:600;cursor:pointer;font-size:.9rem}
+.nav button:hover{background:rgba(255,255,255,.16)}
+.nav button.on{background:var(--gold);color:var(--pd);border-color:var(--gold)}
+.container{max-width:1100px;margin:0 auto;padding:1.5rem}
+.area-select{display:none}.area-select.on{display:block}
+.meta{background:var(--c);border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;box-shadow:0 1px 4px rgba(0,0,0,.06);display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem}
+.meta label{display:block;font-size:.8rem;color:var(--m);margin-bottom:.3rem}
+.meta input,.meta select{width:100%;padding:.55rem .75rem;border:1px solid var(--b);border-radius:8px;font-size:.95rem;background:#fff;font-family:inherit}
+.meta select{cursor:pointer}
+.area-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1.25rem;margin-top:1rem}
+.area-card{background:linear-gradient(145deg,var(--p),var(--pd));border:2px solid rgba(200,162,77,.45);border-radius:18px;padding:2.25rem 1.5rem;text-align:center;cursor:pointer;transition:all .18s;box-shadow:0 4px 14px rgba(4,46,31,.3);min-height:210px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;color:#fff}
+.area-card:hover,.area-card:active{border-color:var(--gold);transform:translateY(-4px);box-shadow:0 12px 28px rgba(4,46,31,.4)}
+.area-card .icon{font-size:3.4rem;margin-bottom:.2rem}
+.area-card h3{font-size:1.35rem;color:#fff;font-weight:800}
+.area-card p{font-size:.85rem;color:rgba(243,228,187,.85);max-width:220px}
+.area-card .cnt{font-size:.75rem;background:rgba(200,162,77,.25);color:var(--gold-lt);padding:.25rem .7rem;border-radius:14px;font-weight:700;margin-top:.3rem;border:1px solid rgba(200,162,77,.4)}
+@media(max-width:640px){.area-grid{grid-template-columns:1fr}.area-card{min-height:120px;padding:1.5rem 1.25rem;flex-direction:row;justify-content:flex-start;text-align:left;gap:1rem}.area-card .icon{font-size:2.6rem;margin-bottom:0}.area-card .info{display:flex;flex-direction:column;align-items:flex-start;gap:.25rem}}
+.checklist-view,.history-view{display:none}
+.checklist-view.on,.history-view.on{display:block}
+.back-bar{display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;flex-wrap:wrap}
+.back-bar button{background:var(--p);color:#fff;border:none;padding:.5rem 1rem;border-radius:8px;font-weight:600;cursor:pointer}
+.back-bar h2{font-size:1.2rem;color:var(--p);flex:1}
+.score-pill{background:var(--p);color:var(--gold-lt);border:1px solid var(--gold);padding:.4rem .9rem;border-radius:20px;font-weight:700;font-size:.95rem}
+.qc{background:var(--c);border-radius:12px;padding:1.1rem 1.25rem;margin-bottom:1rem;box-shadow:0 1px 3px rgba(0,0,0,.05);border-left:4px solid #adb5bd}
+.qc.ok{border-left-color:var(--s)}.qc.nok{border-left-color:var(--d)}
+.qh{display:flex;flex-wrap:wrap;align-items:flex-start;gap:.5rem;margin-bottom:.6rem}
+.qcde{font-weight:700;color:var(--p);font-size:.95rem;white-space:nowrap}
+.qtx{flex:1;font-size:.95rem}
+.bdg{display:flex;gap:.35rem;flex-wrap:wrap}
+.bd{font-size:.7rem;font-weight:700;padding:.2rem .5rem;border-radius:4px;text-transform:uppercase}
+.bm{background:var(--gold-lt);color:var(--gold-d)}.be{background:#e3f0e4;color:var(--p)}
+.gd{font-size:.82rem;color:var(--m);background:#f5f8f8;padding:.6rem .8rem;border-radius:6px;margin-bottom:.8rem;white-space:pre-line}
+.ar{display:flex;flex-direction:column;gap:.9rem}
+.rg{display:flex;gap:.75rem;flex-wrap:wrap}
+.rg label{display:flex;align-items:center;gap:.35rem;cursor:pointer;font-weight:500;padding:.35rem .7rem;border-radius:6px;border:1px solid var(--b)}
+.rg input{accent-color:var(--p)}
+.rg label:has(input:checked){border-color:var(--p);background:#e8f3e9}
+.rg .ol:has(input:checked){border-color:var(--s);background:#d1e7dd}
+.rg .nl:has(input:checked){border-color:var(--d);background:#f8d7da}
+.just-box{display:none;margin-top:.5rem}
+.just-box.show{display:block}
+.just-box label{font-size:.8rem;color:var(--d);font-weight:600;margin-bottom:.3rem;display:block}
+.just-box textarea{width:100%;min-height:70px;padding:.6rem .75rem;border:1px solid #e0a0a8;border-radius:8px;font-size:.9rem;font-family:inherit;resize:vertical;background:#fff8f8}
+.just-box textarea:focus{outline:none;border-color:var(--d);box-shadow:0 0 0 3px rgba(164,52,74,.15)}
+.eb{width:100%}
+.add-photo-btn{display:inline-flex;align-items:center;gap:.4rem;background:var(--p);color:#fff;padding:.5rem 1rem;border-radius:8px;font-weight:600;font-size:.85rem;cursor:pointer;user-select:none}
+.add-photo-btn:hover{background:var(--pd)}
+.photo-count{margin-left:.6rem;font-size:.8rem;color:var(--m)}
+.gallery{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:.75rem}
+.thumb{position:relative;width:100px;height:76px;border-radius:8px;overflow:hidden;border:1px solid var(--b);background:#e9eeee}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.thumb .rm{position:absolute;top:2px;right:2px;background:rgba(220,53,69,.92);color:#fff;border:none;width:20px;height:20px;border-radius:50%;font-size:.9rem;line-height:1;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center}
+.lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;align-items:center;justify-content:center;padding:2rem}
+.lightbox.show{display:flex}
+.lightbox img{max-width:100%;max-height:100%;border-radius:8px}
+.lightbox-close{position:absolute;top:1.2rem;right:1.5rem;color:#fff;font-size:2rem;cursor:pointer;background:none;border:none}
+.act{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1.5rem;position:sticky;bottom:1rem;z-index:50}
+.btn{padding:.7rem 1.3rem;border:none;border-radius:8px;font-weight:600;font-size:.95rem;cursor:pointer}
+.bp{background:var(--p);color:#fff}.bp:hover{background:var(--pl)}
+.bs{background:#6c757d;color:#fff}
+.bg{background:linear-gradient(135deg,var(--gold),var(--gold-d));color:var(--pd);font-weight:800}
+.hist-list{display:flex;flex-direction:column;gap:.75rem}
+.hist-card{background:var(--c);border-radius:12px;padding:1.1rem 1.25rem;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;flex-wrap:wrap;align-items:center;gap:1rem;border-left:4px solid var(--p)}
+.hist-card .info{flex:1;min-width:200px}
+.hist-card .info strong{display:block;font-size:1rem;color:var(--p)}
+.hist-card .info span{font-size:.85rem;color:var(--m)}
+.hist-card .score{font-size:1.4rem;font-weight:700;color:var(--p);min-width:70px;text-align:center}
+.hist-card .actions{display:flex;gap:.5rem}
+.hist-card .actions button{padding:.4rem .8rem;border-radius:6px;border:none;font-weight:600;cursor:pointer;font-size:.85rem}
+.btn-view{background:var(--p);color:#fff}.btn-del{background:#fbe4e8;color:var(--d)}
+.empty{text-align:center;padding:3rem;color:var(--m)}
+.fn{text-align:center;font-size:.8rem;color:var(--m);margin-top:2rem;padding-bottom:2rem}
+@media(max-width:600px){header{flex-wrap:wrap}.nav{margin-left:0;width:100%}}
+
+/* ===== Login ===== */
+#login-screen{
+  position:fixed;inset:0;z-index:5000;
+  background:#06402b;
+  display:flex;align-items:center;justify-content:center;
+  padding:1.5rem;
+}
+#login-screen.hidden{display:none}
+.login-card{
+  width:100%;max-width:400px;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(200,162,77,.45);
+  border-radius:18px;padding:2rem 1.75rem 1.75rem;
+  box-shadow:0 12px 40px rgba(0,0,0,.35);
+  backdrop-filter:blur(8px);
+}
+.login-card .logo-wrap{text-align:center;margin-bottom:1.25rem}
+.login-card .logo-wrap img{height:48px;width:auto}
+.login-card h1{
+  color:#fff;font-size:1.2rem;font-weight:700;text-align:center;margin-bottom:.25rem
+}
+.login-card .sub{
+  color:#f3e4bb;font-size:.82rem;text-align:center;margin-bottom:1.4rem;opacity:.9
+}
+.login-card label{display:block;color:#f3e4bb;font-size:.78rem;margin-bottom:.3rem;font-weight:600}
+.login-card input{
+  width:100%;padding:.65rem .85rem;border-radius:8px;border:1px solid rgba(200,162,77,.4);
+  background:rgba(255,255,255,.95);color:#152238;font-size:.95rem;margin-bottom:.9rem;
+  font-family:inherit
+}
+.login-card input:focus{outline:2px solid #c8a24d;outline-offset:1px}
+.login-card .btn-login{
+  width:100%;padding:.75rem;border:none;border-radius:8px;
+  background:linear-gradient(135deg,#c8a24d,#a3812f);color:#042e1f;
+  font-weight:800;font-size:1rem;cursor:pointer;margin-top:.25rem
+}
+.login-card .btn-login:hover{filter:brightness(1.05)}
+.login-error{
+  display:none;background:rgba(164,52,74,.25);border:1px solid rgba(164,52,74,.5);
+  color:#ffc9d0;padding:.55rem .75rem;border-radius:8px;font-size:.85rem;margin-bottom:.9rem;text-align:center
+}
+.login-error.show{display:block}
+.login-foot{text-align:center;color:rgba(243,228,187,.55);font-size:.72rem;margin-top:1.1rem}
+#app-root.hidden{display:none}
+.user-chip{
+  font-size:.78rem;color:#f3e4bb;border:1px solid rgba(200,162,77,.4);
+  padding:.3rem .7rem;border-radius:20px;background:rgba(255,255,255,.08);white-space:nowrap
+}
+.btn-logout{
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.25);color:#fff;
+  padding:.4rem .85rem;border-radius:8px;font-weight:600;cursor:pointer;font-size:.85rem
+}
+.btn-logout:hover{background:rgba(255,255,255,.16)}
+.hist-filter{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem;align-items:center}
+.hist-filter label{font-size:.8rem;color:var(--m);font-weight:600}
+.hist-filter select{
+  padding:.4rem .7rem;border:1px solid var(--b);border-radius:8px;font-size:.9rem;background:#fff
+}
+.hist-card .nc{font-size:.8rem;color:var(--d);font-weight:600}
+.readonly-banner{
+  background:#fff6df;border:1px solid #e0c56a;color:#8a6b00;
+  padding:.65rem 1rem;border-radius:10px;margin-bottom:1rem;font-size:.88rem;font-weight:600
+}
+body.readonly-mode .rg input,
+body.readonly-mode .rg label,
+body.readonly-mode .just-box textarea,
+body.readonly-mode .add-photo-btn,
+body.readonly-mode .thumb .rm,
+body.readonly-mode input[type="file"]{
+  pointer-events:none !important;
+  cursor:not-allowed !important;
+}
+body.readonly-mode .rg label{opacity:.85}
+body.readonly-mode .just-box textarea{
+  opacity:1; background:#f3f4f6 !important; border-color:#cfd3db !important; color:#333 !important;
+  resize:none !important;
+}
+body.readonly-mode .add-photo-btn,
+body.readonly-mode .thumb .rm{display:none !important}
+body.readonly-mode .act .bg,
+body.readonly-mode .act .bs{display:none !important}
+body.readonly-mode .meta input,
+body.readonly-mode .meta select{
+  pointer-events:none !important; background:#f3f4f6 !important; opacity:.9;
+}
+body.viewer-mode #btnNova{display:none !important}
+
+/* ===== Cronograma ===== */
+.crono-view{display:none}
+.crono-view.on{display:block}
+.crono-toolbar{display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;margin-bottom:1rem}
+.crono-toolbar h2{color:var(--p);font-size:1.2rem;flex:1;margin:0}
+.crono-dealer-tabs{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
+.crono-dealer-tabs button{
+  background:#fff;border:1px solid var(--b);color:var(--t);padding:.45rem 1rem;border-radius:8px;
+  font-weight:600;cursor:pointer;font-size:.9rem
+}
+.crono-dealer-tabs button.on{background:var(--p);color:#fff;border-color:var(--p)}
+.crono-legend-areas{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem}
+.crono-legend-areas .lg{
+  display:inline-flex;align-items:center;gap:.4rem;font-size:.8rem;font-weight:600;color:var(--t);
+  background:#fff;border:1px solid var(--b);border-radius:20px;padding:.25rem .7rem
+}
+.crono-legend-areas .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.crono-layout{display:grid;grid-template-columns:1fr 300px;gap:1rem;align-items:start}
+@media(max-width:900px){.crono-layout{grid-template-columns:1fr}}
+.crono-cal{
+  background:var(--c);border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);padding:1rem 1.1rem;overflow:hidden
+}
+.crono-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem}
+.crono-cal-head h3{margin:0;font-size:1.05rem;color:var(--p);font-weight:700}
+.crono-cal-nav{display:flex;gap:.4rem}
+.crono-cal-nav button{
+  background:var(--p);color:#fff;border:none;width:32px;height:32px;border-radius:8px;
+  font-weight:700;cursor:pointer;font-size:1rem;line-height:1
+}
+.crono-cal-nav button:hover{background:var(--pl)}
+.crono-weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px}
+.crono-weekdays span{
+  text-align:center;font-size:.7rem;font-weight:700;color:var(--m);text-transform:uppercase;padding:.35rem 0
+}
+.crono-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.crono-day{
+  min-height:88px;background:#f7faf8;border:1px solid var(--b);border-radius:8px;padding:4px;
+  display:flex;flex-direction:column;gap:2px
+}
+.crono-day.out{opacity:.4;background:#eef1f4}
+.crono-day.today{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
+.crono-day .dn{font-size:.72rem;font-weight:700;color:var(--m);padding:1px 3px}
+.crono-day.today .dn{color:var(--p)}
+.crono-ev{
+  font-size:.65rem;line-height:1.2;padding:2px 4px;border-radius:4px;color:#fff;font-weight:600;
+  cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:none;text-align:left;width:100%
+}
+.crono-ev:hover{filter:brightness(1.08)}
+.crono-side{display:flex;flex-direction:column;gap:1rem}
+.crono-form{
+  background:var(--c);border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);padding:1rem 1.1rem;
+  border-top:3px solid var(--gold)
+}
+.crono-form h3{margin:0 0 .75rem;font-size:.95rem;color:var(--p)}
+.crono-form .fg{margin-bottom:.65rem}
+.crono-form label{display:block;font-size:.75rem;color:var(--m);font-weight:600;margin-bottom:.25rem}
+.crono-form input,.crono-form select{
+  width:100%;padding:.5rem .65rem;border:1px solid var(--b);border-radius:8px;font-size:.9rem;font-family:inherit;background:#fff
+}
+.crono-form .row2{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.crono-form .actions{display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap}
+.crono-form .actions .btn{flex:1;min-width:110px;text-align:center}
+.crono-list{
+  background:var(--c);border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);padding:1rem 1.1rem;max-height:320px;overflow:auto
+}
+.crono-list h3{margin:0 0 .6rem;font-size:.95rem;color:var(--p)}
+.crono-list-item{
+  display:flex;align-items:flex-start;gap:.5rem;padding:.5rem 0;border-bottom:1px solid var(--b);font-size:.82rem
+}
+.crono-list-item:last-child{border-bottom:none}
+.crono-list-item .bar{width:4px;border-radius:2px;align-self:stretch;flex-shrink:0}
+.crono-list-item .meta{flex:1;min-width:0}
+.crono-list-item .meta strong{display:block;color:var(--t);font-size:.85rem}
+.crono-list-item .meta span{color:var(--m);font-size:.75rem}
+.crono-list-item .rm{
+  background:#fbe4e8;color:var(--d);border:none;border-radius:6px;padding:.25rem .5rem;
+  font-size:.75rem;font-weight:600;cursor:pointer;flex-shrink:0
+}
+.crono-legend{font-size:.8rem;color:var(--m);margin-top:.75rem}
+body.viewer-mode .crono-edit-only{display:none !important}
+
+/* ===== Rascunho ===== */
+.draft-chip{
+  display:inline-flex;align-items:center;gap:.4rem;font-size:.78rem;font-weight:600;
+  background:#fff6df;color:#8a6b00;border:1px solid #e0c56a;border-radius:20px;
+  padding:.3rem .75rem;margin-left:.25rem
+}
+.draft-chip.ok{background:#e4f5ee;color:#2f6b4f;border-color:#b8e0cc}
+.draft-chip.warn{background:#fbeae8;color:#c6483e;border-color:#f0c9c5}
+.draft-banner{
+  background:#eef6ff;border:1px solid #b6d4fe;color:#0b3d91;
+  padding:.65rem 1rem;border-radius:10px;margin-bottom:1rem;font-size:.88rem;
+  display:flex;flex-wrap:wrap;align-items:center;gap:.75rem
+}
+.draft-banner button{
+  background:var(--p);color:#fff;border:none;border-radius:8px;padding:.35rem .75rem;
+  font-weight:600;font-size:.82rem;cursor:pointer
+}
+.draft-banner button.sec{background:#fff;color:var(--p);border:1px solid var(--b)}
+
+
+
+
+
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <div class="logo-wrap">
+      <img src="Logotipo_Carmak__Branco_.png" alt="Carmak" onerror="this.style.display='none'">
+    </div>
+    <h1>Checklist Auditoria ASEC</h1>
+    <p class="sub">Acesso restrito · Uso interno Carmak</p>
+    <div class="login-error" id="loginError">Usuário ou senha inválidos</div>
+    <label for="loginUser">E-mail</label>
+    <input type="email" id="loginUser" autocomplete="username" placeholder="seu@email.com">
+    <label for="loginPass">Senha</label>
+    <input type="password" id="loginPass" autocomplete="current-password" placeholder="Senha">
+    <button type="button" class="btn-login" id="btnLogin" onclick="doLogin()">Entrar</button>
+    <p class="login-foot">Carmak · Toyota Material Handling · Documento controlado</p>
+  </div>
+</div>
+<div id="app-root" class="hidden">
+
+<header>
+<img class="logo" src="Logotipo_Carmak__Branco_.png" alt="Carmak" onerror="this.style.display='none'">
+<div class="titles">
+<h1>Checklist Auditoria Interna ASEC</h1>
+<p>Carmak • Toyota Material Handling</p>
+</div>
+<div class="nav">
+<span class="user-chip" id="userChip">—</span>
+<button id="btnNova" class="on" onclick="showView('select')">Nova Auditoria</button>
+<button id="btnCrono" onclick="showView('crono')">Cronograma</button>
+<button id="btnHist" onclick="showView('history')">Histórico</button>
+<button type="button" class="btn-logout" onclick="doLogout()">Sair</button>
+</div>
+</header>
+
+<div class="container">
+<div id="view-select" class="area-select on">
+<div class="meta">
+<div>
+<label>Nome do Auditor *</label>
+<select id="auditorName"><option value="Luan Mota" selected>Luan Mota</option></select>
+</div>
+<div>
+<label>Dealer / Filial *</label>
+<select id="dealerName">
+<option value="">Selecione...</option>
+<option value="Matriz - São Leopoldo RS">Matriz - São Leopoldo RS</option>
+<option value="Filial - Itajaí SC">Filial - Itajaí SC</option>
+</select>
+</div>
+<div><label>Data da Auditoria</label><input type="date" id="auditDate"></div>
+<div><label>Observações Gerais</label><input type="text" id="generalNotes" placeholder="Opcional"></div>
+</div>
+<h2 style="color:var(--p);margin-bottom:.5rem;font-size:1.15rem">Selecione a área a ser auditada</h2>
+<p style="color:var(--m);margin-bottom:1rem;font-size:.9rem">Escolha o setor para iniciar o checklist</p>
+<div class="area-grid" id="areaGrid"></div>
+</div>
+
+<div id="view-checklist" class="checklist-view">
+<div class="back-bar">
+<button onclick="showView('select')">← Voltar</button>
+<h2 id="areaTitle">Área</h2>
+<div class="score-pill" id="areaScore">—</div>
+<span class="draft-chip" id="draftChip" style="display:none" title="Rascunho local no aparelho">Rascunho</span>
+</div>
+<div id="questionsContainer"></div>
+<div class="act">
+<button class="btn bp" onclick="generatePDF()">📄 Gerar Relatório PDF</button>
+<button class="btn bg" onclick="saveToHistory()">💾 Salvar no Histórico</button>
+<button class="btn bs" onclick="resetCurrent()">🔄 Limpar Respostas</button>
+</div>
+</div>
+
+
+<div id="view-crono" class="crono-view">
+  <div class="crono-toolbar">
+    <h2>Cronograma de Auditorias ASEC</h2>
+  </div>
+  <div class="crono-dealer-tabs" id="cronoDealerTabs"></div>
+  <div class="crono-legend-areas" id="cronoAreaLegend"></div>
+  <div class="crono-layout">
+    <div class="crono-cal">
+      <div class="crono-cal-head">
+        <h3 id="cronoMonthLabel">—</h3>
+        <div class="crono-cal-nav">
+          <button type="button" onclick="cronoShiftMonth(-1)" title="Mês anterior">‹</button>
+          <button type="button" onclick="cronoGoToday()" title="Hoje" style="width:auto;padding:0 .7rem;font-size:.8rem">Hoje</button>
+          <button type="button" onclick="cronoShiftMonth(1)" title="Próximo mês">›</button>
+        </div>
+      </div>
+      <div class="crono-weekdays">
+        <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+      </div>
+      <div class="crono-grid" id="cronoGrid"></div>
+    </div>
+    <div class="crono-side">
+      <div class="crono-form crono-edit-only">
+        <h3 id="cronoFormTitle">Nova auditoria</h3>
+        <input type="hidden" id="cronoEditId" value="">
+        <div class="fg">
+          <label>Dealer / Filial *</label>
+          <select id="cronoF_dealer">
+            <option value="Matriz - São Leopoldo RS">Matriz - São Leopoldo RS</option>
+            <option value="Filial - Itajaí SC">Filial - Itajaí SC</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Área *</label>
+          <select id="cronoF_area"></select>
+        </div>
+        <div class="fg">
+          <label>Ponto focal</label>
+          <input type="text" id="cronoF_focal" placeholder="Preenchido automaticamente">
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label>Data prevista *</label>
+            <input type="date" id="cronoF_date">
+          </div>
+          <div class="fg">
+            <label>Horário</label>
+            <input type="time" id="cronoF_time" value="09:00">
+          </div>
+        </div>
+        <div class="fg">
+          <label>Modalidade</label>
+          <select id="cronoF_mode">
+            <option value="Presencial">Presencial</option>
+            <option value="Online">Online</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Observação</label>
+          <input type="text" id="cronoF_notes" placeholder="Opcional">
+        </div>
+        <div class="actions">
+          <button type="button" class="btn bp" onclick="submitCronoForm()">Salvar</button>
+          <button type="button" class="btn bs" onclick="resetCronoForm()">Limpar</button>
+        </div>
+      </div>
+      <div class="crono-list">
+        <h3>Agenda do mês</h3>
+        <div id="cronoMonthList"></div>
+      </div>
+    </div>
+  </div>
+  <p class="crono-legend">Cores por área no calendário. Clique em um evento para editar. Somente Qualidade inclui ou remove datas. Dados do cronograma salvos no Supabase (compartilhados entre usuários).</p>
+</div>
+
+<div id="view-history" class="history-view">
+<h2 style="color:var(--p);margin-bottom:1rem">Histórico de Relatórios</h2>
+<div class="hist-filter" id="histFilterBar">
+  <label for="histMonthFilter">Mês</label>
+  <select id="histMonthFilter" onchange="renderHistory()">
+    <option value="">Todos os meses</option>
+  </select>
+  <label for="histAreaFilter">Área</label>
+  <select id="histAreaFilter" onchange="renderHistory()">
+    <option value="">Todas as áreas</option>
+  </select>
+  <label for="histDealerFilter">Dealer / Filial</label>
+  <select id="histDealerFilter" onchange="renderHistory()">
+    <option value="">Todos</option>
+  </select>
+</div>
+<div class="hist-list" id="histList"></div>
+</div>
+
+<p class="fn">Carmak • Checklist Auditoria Interna ASEC</p>
+</div>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+<button class="lightbox-close" onclick="closeLightbox()">×</button>
+<img id="lightboxImg" src="" alt="Evidência">
+</div>
+</div><!-- /app-root -->
+
+<script>
+// ===== Supabase Auth (bloco isolado) =====
+var SUPABASE_URL = "https://mhvmhynjjmeachwfmtae.supabase.co";
+var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1odm1oeW5qam1lYWNod2ZtdGFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3MjIyNzcsImV4cCI6MjEwMzI5ODI3N30.mVRUT3hDpVDp49NLF9zSH964m6hBQx6xv33UkbrytRM";
+
+var supabase = null;
+var currentUser = null;
+var readOnly = false;
+var sbSession = null; // { access_token, refresh_token, user }
+
+function initSupabaseClient() {
+  try {
+    var lib = window.supabase;
+    if (lib && typeof lib.createClient === "function") {
+      return lib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+  } catch (e) {
+    console.warn("createClient falhou", e);
+  }
+  return null;
+}
+
+supabase = initSupabaseClient();
+
+/** Login via REST (não depende da lib JS) */
+async function restSignIn(email, password) {
+  var res = await fetch(SUPABASE_URL + "/auth/v1/token?grant_type=password", {
+    method: "POST",
+    headers: {
+      "apikey": SUPABASE_ANON_KEY,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ email: email, password: password })
+  });
+  var body = await res.json().catch(function(){ return {}; });
+  if (!res.ok) {
+    var msg = (body && (body.error_description || body.msg || body.error)) || ("HTTP " + res.status);
+    var err = new Error(msg);
+    err.status = res.status;
+    err.body = body;
+    throw err;
+  }
+  return body; // access_token, refresh_token, user, ...
+}
+
+async function restGetProfile(userId, accessToken) {
+  var url = SUPABASE_URL + "/rest/v1/profiles?id=eq." + encodeURIComponent(userId) + "&select=id,email,full_name,role,area";
+  var res = await fetch(url, {
+    headers: {
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": "Bearer " + accessToken,
+      "Accept": "application/json"
+    }
+  });
+  if (!res.ok) {
+    console.error("profiles HTTP", res.status, await res.text());
+    return null;
+  }
+  var rows = await res.json();
+  if (!rows || !rows.length) return null;
+  var d = rows[0];
+  return { id: d.id, email: d.email, role: d.role, area: d.area, label: d.full_name || d.email };
+}
+
+async function loadProfile(userId) {
+  if (supabase) {
+    var res = await supabase.from("profiles").select("id, email, full_name, role, area").eq("id", userId).single();
+    if (res.error || !res.data) {
+      console.error("Perfil não encontrado:", res.error);
+      return null;
+    }
+    var d = res.data;
+    return { id: d.id, email: d.email, role: d.role, area: d.area, label: d.full_name || d.email };
+  }
+  if (sbSession && sbSession.access_token) {
+    return restGetProfile(userId, sbSession.access_token);
+  }
+  return null;
+}
+
+async function doLogin() {
+  var emailEl = document.getElementById("loginUser");
+  var passEl = document.getElementById("loginPass");
+  var err = document.getElementById("loginError");
+  var email = (emailEl && emailEl.value || "").trim();
+  var password = passEl && passEl.value || "";
+  if (err) err.classList.remove("show");
+
+  function showErr(msg) {
+    if (!err) { alert(msg); return; }
+    err.textContent = msg;
+    err.classList.add("show");
+  }
+
+  if (!email || !password) {
+    showErr("Informe e-mail e senha");
+    return;
+  }
+
+  var btn = document.getElementById("btnLogin");
+  if (btn) { btn.disabled = true; btn.textContent = "Entrando..."; }
+
+  try {
+    // 1) tenta lib; 2) fallback REST
+    if (!supabase) supabase = initSupabaseClient();
+
+    var userId = null;
+
+    if (supabase) {
+      var result = await supabase.auth.signInWithPassword({ email: email, password: password });
+      if (result.error) {
+        console.error(result.error);
+        showErr("Usuário ou senha inválidos");
+        return;
+      }
+      userId = result.data.user.id;
+      sbSession = result.data.session;
+    } else {
+      console.warn("Usando login REST (lib Supabase ausente)");
+      var session = await restSignIn(email, password);
+      sbSession = session;
+      userId = session.user && session.user.id;
+      if (!userId) {
+        showErr("Login sem user id");
+        return;
+      }
+      // guarda token para o restante do app (REST)
+      try {
+        localStorage.setItem("sb_access_token", session.access_token || "");
+        localStorage.setItem("sb_refresh_token", session.refresh_token || "");
+      } catch (e) {}
+    }
+
+    var profile = await loadProfile(userId);
+    if (!profile) {
+      showErr("Login ok, mas perfil não encontrado na tabela profiles");
+      try {
+        if (supabase) await supabase.auth.signOut();
+      } catch (e) {}
+      return;
+    }
+    currentUser = profile;
+    if (typeof enterApp === "function") {
+      enterApp();
+      setTimeout(function(){ offerRestoreDraftOnEnter(); }, 400);
+    } else {
+      showErr("App principal não carregou (erro no script). Veja o Console (F12).");
+      console.error("enterApp não definido");
+    }
+  } catch (e) {
+    console.error(e);
+    var m = (e && e.message) ? e.message : String(e);
+    if (/invalid|credentials|email|password|401/i.test(m)) {
+      showErr("Usuário ou senha inválidos");
+    } else {
+      showErr("Erro: " + m);
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "Entrar"; }
+  }
+}
+
+async function doLogout() {
+  try { if (supabase) await supabase.auth.signOut(); } catch (e) {}
+  try {
+    localStorage.removeItem("sb_access_token");
+    localStorage.removeItem("sb_refresh_token");
+  } catch (e) {}
+  sbSession = null;
+  currentUser = null;
+  readOnly = false;
+  document.body.classList.remove("readonly-mode", "viewer-mode");
+  var app = document.getElementById("app-root");
+  var login = document.getElementById("login-screen");
+  if (app) app.classList.add("hidden");
+  if (login) login.classList.remove("hidden");
+  var pass = document.getElementById("loginPass");
+  if (pass) pass.value = "";
+  if (typeof showView === "function") showView("select");
+}
+
+
+function getAccessToken() {
+  if (sbSession && sbSession.access_token) return sbSession.access_token;
+  try { return localStorage.getItem("sb_access_token") || ""; } catch (e) { return ""; }
+}
+
+async function restQuery(path, options) {
+  options = options || {};
+  var token = getAccessToken();
+  var headers = {
+    "apikey": SUPABASE_ANON_KEY,
+    "Authorization": "Bearer " + (token || SUPABASE_ANON_KEY),
+    "Accept": "application/json"
+  };
+  if (options.body) {
+    headers["Content-Type"] = "application/json";
+    headers["Prefer"] = options.prefer || "return=representation";
+  }
+  var res = await fetch(SUPABASE_URL + path, {
+    method: options.method || "GET",
+    headers: headers,
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
+  var textBody = await res.text();
+  var data = null;
+  try { data = textBody ? JSON.parse(textBody) : null; } catch (e) { data = textBody; }
+  if (!res.ok) {
+    var msg = (data && (data.message || data.msg || data.error_description)) || ("HTTP " + res.status);
+    var err = new Error(msg);
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
+function isMaster() {
+  return currentUser && currentUser.role === "master";
+}
+function canAccessArea(areaKey) {
+  if (!currentUser) return false;
+  if (currentUser.role === "master") return true;
+  return currentUser.area === areaKey;
+}
+</script>
+<script>
+const ICONS = {RH:"👥",Seg:"🛡️",Pos:"🔧",Ofi:"🏭",Alm:"📦"};
+const A = {
+RH:{n:"Recursos Humanos",q:[
+{i:"Q1-1",t:"O dealer / filial possui organograma para todos os membros do departamento de peças e serviços e há descrição das funções de cada cargo mencionado no organograma?",g:"Verifique o organograma e as descrições das funções. Analise se estão atualizados e se existe política de atualização.",m:0,e:0},
+{i:"Q2-1",t:"Existe um mapa de habilidades para todos os técnicos e os treinamentos são planejados baseado neste mapa de habilidades?",g:"(Evidenciável)",m:0,e:1},
+{i:"Q2-2",t:"Existe um programa motivacional para estimular os técnicos a aperfeiçoar suas habilidades técnicas através de treinamentos?",g:"Programa de incentivos com regras claras, compartilhado e baseado na melhoria de conhecimento/habilidades.",m:0,e:0}
+]},
+Seg:{n:"Segurança",q:[
+{i:"Q1-2",t:"Todos os técnicos usam uniformes corporativos?",g:"Mínimo 02 conjuntos. Verificar ficha de EPI e manual de identidade visual Toyota.",m:1,e:1},
+{i:"Q3-1",t:"Existe uma política relacionada a segurança e meio ambiente para materiais perigosos (LLC, Baterias, Óleo usado entre outros)?",g:"Política de armazenagem e descarte responsável. Área designada e identificada.",m:0,e:0},
+{i:"Q3-2",t:"Os locais de armazenamento de óleo usado e baterias danificadas estão claramente identificados? Estão protegidos por teto e de uma maneira que não prejudica o meio ambiente?",g:"Identificados, protegidos da chuva, bandeja de contenção.",m:1,e:1},
+{i:"Q3-3",t:"Existe um procedimento operacional para descarte de óleo usado?",g:"Pessoa responsável + procedimento de emergência visível.",m:0,e:0},
+{i:"Q3-4",t:"Existe material absorvente de óleo disponível sempre que necessário e está em boas condições de uso? Existe um padrão para reabastecimento do produto?",g:"Local específico identificado + ponto de reposição visível.",m:1,e:1},
+{i:"Q3-5",t:"O relatório de risco ambiental é enviado para as pessoas responsáveis em tempo hábil? São tomadas as medidas preventivas para que não ocorra novamente?",g:"Procedimento para relatar risco, causa raiz e contramedida. Compartilhamento com a equipe.",m:0,e:1},
+{i:"Q4-1",t:"Existe uma política de segurança da empresa para as operações de segurança?",g:"Pessoa responsável apta + política com itens obrigatórios e EPIs necessários.",m:0,e:0},
+{i:"Q4-3",t:"O dealer / filial entende e compreende quais qualificações de segurança são necessárias para cada membro da equipe em sua operação?",g:"Lista de qualificações por técnico atualizada. Verificar Skill Map.",m:0,e:1},
+{i:"Q4-5",t:"Existe check list de Pré-Operação nos equipamentos de instalação? Exemplos: (Esmeril, Tornos, Furadeiras, Máquinas de Solda e etc.).",g:"Equipamentos listados e identificados. Check list próximo e atualizado.",m:0,e:1},
+{i:"Q4-7",t:"Existe um Kit de primeiros socorros disponível? Ele é mantido em boas condições?",g:"Local fechado, itens designados, controle de validade sem vencidos.",m:1,e:1},
+{i:"Q4-8",t:"Existe extintores de incêndio disponíveis para uso?",g:"Acesso livre, identificações visíveis, inspeções atualizadas.",m:1,e:1},
+{i:"Q4-9",t:"Objetos de metais afiados e baixas saliências têm identificações ou proteção?",g:"Indicação de aviso e/ou proteção. Verificar banheiro de clientes.",m:0,e:0},
+{i:"Q4-10",t:"Todas as escadas na área de Peças e Serviços têm corrimãos e algum método para evitar escorregamento? Estão bem conservados em condições limpas?",g:"Corrimão + antiderrapante. Livres de obstruções e secas.",m:0,e:0},
+{i:"Q4-11",t:"O relatório de acidente com os membros da equipe é submetido às pessoas responsáveis imediatamente após o acidente? E as medidas preventivas contra recorrência são tomadas?",g:"Política de relatório, causa raiz, contramedida e compartilhamento.",m:0,e:0},
+{i:"Q5-2",t:"O cliente pode se localizar facilmente dentro do dealer / filial ao fazer uma visita? Ele encontra o departamento desejado através de sinalizações?",g:"Sinalizações claras e fáceis de entender.",m:1,e:1},
+{i:"Q9-10-2",t:"O relatório de acidente no cliente é submetido à alta direção da matriz em tempo hábil?",g:"Procedimento padrão para reportar acidentes no cliente à matriz.",m:0,e:0}
+]},
+Pos:{n:"Pós Venda",q:[
+{i:"Q1-2",t:"Todos os técnicos usam uniformes corporativos?",g:"Mínimo 02 conjuntos. EPI e identidade visual Toyota.",m:1,e:1},
+{i:"Q5-1",t:"O dealer / filial está usando o logotipo definido pela Toyota como indicação principal?",g:"Logo Toyota na frente do logo do dealer.",m:1,e:1},
+{i:"Q5-3",t:"Existe estacionamento dedicado para clientes / visitantes? Eles estão claramente identificados?",g:"Estacionamento dedicado com linhas e sinais.",m:0,e:1},
+{i:"Q5-4",t:"O horário de funcionamento do dealer / filial está claramente indicado para os clientes, existe telefone especial em casos de emergência fora do horário de expediente?",g:"Horário e telefone de emergência visíveis.",m:0,e:1},
+{i:"Q7-1",t:"As vans de serviços estão identificadas de modo que o cliente possa identificar que é um serviço de empilhadeira Toyota?",g:"Padrão de identidade visual Toyota.",m:0,e:1},
+{i:"Q7-2",t:"As partes internas e externas das vans são mantidas em boas condições e organizadas?",g:"Externa limpa sem riscos/adesivos. Interna organizada sem lixo.",m:1,e:1},
+{i:"Q7-3",t:"As ferramentas, equipamentos e peças têm locais de armazenagem nas vans de serviços? E cada item é armazenado em seu próprio local e tem a designação apropriada?",g:"Lista de ferramentas. Local designado com indicação.",m:1,e:1},
+{i:"Q8-5",t:"O dealer / filial explica para o cliente como usar e manter a empilhadeira nova no momento da entrega?",g:"Explicar funcionamento, manutenção e cronograma.",m:0,e:0},
+{i:"Q8-6",t:"O Dealer / Filial atualiza as informações de cadastro do cliente no momento da entrega do equipamento?",g:"Cadastro com máquina, cliente, histórico, entrega, PDI. Procedimento escrito.",m:0,e:0},
+{i:"Q9-1-1",t:"O dealer / filial registra a solicitação de serviço do cliente com as próprias palavras dele?",g:"Formulário específico. Confirmar anotações com o cliente.",m:0,e:0},
+{i:"Q9-1-2",t:"O consultor de serviços aloca um técnico apropriado baseado em habilidade e qualificação de um modo oportuno quando ele / ela recebe pedido de serviço?",g:"Alocação oportuna por qualificação.",m:0,e:0},
+{i:"Q9-2",t:"O histórico de atendimento anteriores do cliente é revisado antes da ligação ou visita no cliente?",g:"Histórico acessível no sistema ou papel.",m:0,e:0},
+{i:"Q9-3-1",t:"O dealer / filial tem programação para os técnicos de campo e internos? E estão claramente visíveis?",g:"Plano de visita e cronograma de oficina visíveis.",m:0,e:1},
+{i:"Q9-3-2",t:"O cronograma dos técnicos é planejado considerando a eficiência e o indicador de meta mensal do dealer / filial?",g:"Tempo padrão + eficiência + meta. Procedimento escrito.",m:0,e:1},
+{i:"Q9-3-3",t:"O progresso da ordem de serviço é monitorado e gerenciado?",g:"Relato diário + monitoramento + plano de recuperação.",m:0,e:0},
+{i:"Q9-4",t:"Todas as ordens de serviço são atribuídas aos técnicos com base em seu nível de conhecimento e experiência?",g:"Skill Map + experiência.",m:0,e:0},
+{i:"Q9-5",t:"A ordem de serviço contém todas as informações necessárias para o reparo? E em caso de retrabalho, está claramente indicado na ordem de serviço?",g:"Dados completos do cliente/máquina + indicação de retrabalho.",m:0,e:1},
+{i:"Q9-6-1",t:"Em caso de reforma solicitado pelo cliente, o conteúdo da ordem de serviço é revisado com o cliente antes que o técnico inicie os serviços de reparação?",g:"Confirmar trabalho, tempo e custo. Cotação aprovada.",m:0,e:0},
+{i:"Q9-6-2",t:"O revendedor / filial recebe aprovação do cliente para reparo adicional?",g:"Aprovação com explicação clara.",m:0,e:0},
+{i:"Q9-7",t:"Uma inspeção de controle de qualidade é feita após as reformas de máquinas serem concluídas?",g:"Check list de QC em todos os equipamentos.",m:0,e:0},
+{i:"Q9-8-1",t:"O técnico explica claramente para o cliente todo serviço que foi realizado no equipamento após o término?",g:"Explicação + assinatura do cliente.",m:0,e:1},
+{i:"Q9-8-2",t:"O técnico mostra ao cliente todas as peças substituídas?",g:"Mostrar ou oferecer as peças substituídas.",m:0,e:0},
+{i:"Q9-8-3",t:"O técnico informa para o cliente quando será a próxima manutenção preventiva?",g:"Informar data (etiquetas ou similar).",m:0,e:1},
+{i:"Q9-9-1",t:"Os técnicos de campo limpam o equipamento e o site do cliente após finalizar o serviço?",g:"Limpar equipamento e site do cliente.",m:0,e:0},
+{i:"Q9-9-2",t:"O supervisor / gestor utiliza um relatório diário tanto dos técnicos de campo quanto dos da oficina, a fim de verificar a situação do equipamento após a manutenção?",g:"Checar relatório diário e dar instruções.",m:0,e:0},
+{i:"Q9-10-1",t:"O dealer / filial faz pesquisa de satisfação após realizar os serviços nos clientes?",g:"Método de acompanhamento agendado.",m:0,e:0},
+{i:"Q9-11-1",t:"O dealer / filial envia um relatório técnico para a matriz ou departamento responsável em tempo hábil?",g:"5W2H + foto/vídeo quando possível.",m:0,e:0},
+{i:"Q9-11-2",t:"Informações como retrabalho ou dificuldades em efetuar algum reparo, são compartilhados entre todos os técnicos?",g:"Reuniões ou documentos. Verificar evidência.",m:0,e:0},
+{i:"Q10-1",t:"O dealer / filial mantém uma atualização frequente do cadastro dos clientes?",g:"Dados cliente + equipamento + histórico. Atualizar a cada visita.",m:1,e:1},
+{i:"Q10-2",t:"O serviço é realizado de acordo com o que foi acordado em contrato com o cliente?",g:"Lista de máquinas com contrato + plano pré-agendado.",m:0,e:0},
+{i:"Q10-3",t:"O dealer / filial gerencia mensalmente a meta de receita de serviços?",g:"Metas de Serviços + Peças genuínas + locais. Plano de recuperação.",m:1,e:1},
+{i:"Q10-4",t:"O dealer / filial define os KPIs necessários para gerenciar os indicadores de serviços?",g:"Lucratividade, Cobertura, Eficiência. Verificar mensalmente.",m:0,e:1},
+{i:"Q10-5",t:"O dealer / filial gerencia as vendas de peças através de serviços e vendas de peças no balcão separadamente?",g:"Registro separado de vendas de peças.",m:0,e:0},
+{i:"Q10-6",t:"O dealer / filial oferece serviços ou os programas de promoção de peças feito pela matriz?",g:"Implementar e reportar programas da matriz.",m:0,e:0},
+{i:"Q11-1",t:"O dealer / filial identifica com precisão as máquinas de sua região e sabe quais estão com contrato e quais estão sem contrato?",g:"Máquinas confirmadas no território. Incluir outras marcas atendidas.",m:0,e:0},
+{i:"Q11-2",t:"O dealer / filial pode identificar o status de serviço das máquinas sem contrato?",g:"Status identificado por equipe de promoção.",m:0,e:0},
+{i:"Q11-3",t:"O dealer / filial tem um processo constante para a atualização da população de máquinas (UIO)?",g:"Procedimento de atualização + registros de visitas.",m:0,e:0},
+{i:"Q11-4",t:"O dealer / filial define uma meta de venda de contratos de serviços?",g:"Metas anuais/mensais por prioridade.",m:0,e:1},
+{i:"Q11-5",t:"O dealer / filial tem equipes responsáveis pelas atividades vendas de contrato de serviços? E são suficientes para atender a demanda?",g:"Job description + visitas padronizadas + pessoal suficiente.",m:0,e:1},
+{i:"Q11-6",t:"Os departamentos de vendas de máquinas e vendas de contratos de serviços trabalham juntos para a venda do contrato de serviço aos clientes?",g:"Oferta na negociação da máquina. Compartilhamento de leads.",m:0,e:0},
+{i:"Q11-7",t:"O dealer / filial tem um menu de contrato de serviço para oferecer as opções de contratos de serviços ao cliente?",g:"Menus + ferramentas promocionais.",m:1,e:1},
+{i:"Q11-8",t:"O dealer / filial visita clientes para oferecer contratos de serviço?",g:"Cronograma mensal com progresso.",m:0,e:1},
+{i:"Q11-9",t:"O dealer / filial prepara uma lista de clientes e máquinas em potencial para ofertar / prospectar contratos de serviços?",g:"Listas por categoria + plano de visita.",m:0,e:1},
+{i:"Q11-10",t:"O dealer / filial gerencia as atividades promocionais / vendas de contratos de serviços?",g:"Atualização diária/semanal + visualização de status.",m:0,e:0},
+{i:"Q11-11",t:"O revendedor / filial confere o progresso da promoção de contrato de serviço e revisa o plano de visita mensal se necessário?",g:"Verificar no meio e final do mês.",m:0,e:0},
+{i:"Q12-1",t:"As informações de vendas / entregas de máquinas novas são compartilhadas de uma maneira formal com o departamento de Pós-Vendas?",g:"Procedimento escrito + cadastro atualizado.",m:0,e:0},
+{i:"Q12-2",t:"O departamento de Pós-Vendas é apresentado ao cliente pelo departamento de vendas?",g:"Procedimento de apresentação na entrega.",m:0,e:0},
+{i:"Q12-3",t:"O departamento de Pós-Venda informa o departamento de Vendas sobre oportunidades de vendas de máquinas novas?",g:"Compartilhar oportunidades de vendas.",m:0,e:0},
+{i:"Q13-3-3",t:"O dealer / filial registra e analisa as vendas perdidas?",g:"Registrar motivos e contramedidas. Considerar no MAD.",m:0,e:0}
+]},
+Ofi:{n:"Oficina",q:[
+{i:"Q3-2",t:"Os locais de armazenamento de óleo usado e baterias danificadas estão claramente identificados? Estão protegidos por teto e de uma maneira que não prejudica o meio ambiente?",g:"Identificados, protegidos, bandeja de contenção.",m:1,e:1},
+{i:"Q3-3",t:"Existe um procedimento operacional para descarte de óleo usado?",g:"Pessoa responsável + emergência visível.",m:0,e:0},
+{i:"Q3-4",t:"Existe material absorvente de óleo disponível sempre que necessário e está em boas condições de uso? Existe um padrão para reabastecimento do produto?",g:"Local identificado + ponto de reposição.",m:1,e:1},
+{i:"Q4-2",t:"O local de itens de segurança compartilhado é designado e identificado? Os itens de segurança são mantidos em boas condições de uso?",g:"Localização própria, limpos e sem danos.",m:1,e:1},
+{i:"Q4-4",t:"O dealer / filial possui equipamentos de facilities pelos quais possam carregar ou descarregar caminhões de uma maneira segura?",g:"Equipamento + procedimento escrito.",m:1,e:1},
+{i:"Q4-6",t:"Existe inspeção periódica para os equipamentos de facilities da oficina? Ex: (Ponto rolante, Elevador HD, Talha, Compressor de Ar e etc.)",g:"Lista, próxima manutenção e responsável. Histórico.",m:0,e:0},
+{i:"Q5-5",t:"Existe vestiário com armários pessoais para a equipe técnica se trocar antes e depois do expediente? Está limpo e organizado?",g:"Armários limpos, com nome, sem lixo.",m:0,e:1},
+{i:"Q5-6",t:"Os banheiros estão limpos e verificados regularmente? Existe banheiros dedicados para clientes?",g:"Condições de uso de banheiros.",m:0,e:1},
+{i:"Q6-1",t:"O piso da oficina está sem sujeira, óleo, água, graxa e etc.?",g:"Sem sujeira/lixo/vazamento após o dia de trabalho.",m:1,e:1},
+{i:"Q6-2",t:"O dealer / filial tem box de serviço claramente demarcados?",g:"Divisões boas. Uma empilhadeira por box com numeração.",m:1,e:1},
+{i:"Q6-3",t:"A oficina tem uma ventilação adequada?",g:"Sistema de ventilação/exaustão.",m:0,e:1},
+{i:"Q6-4",t:"Tem iluminação adequada na oficina de manutenção e no almoxarifado?",g:"Iluminação + luzes portáteis.",m:0,e:1},
+{i:"Q6-5",t:"O técnico da oficina possui ferramentas básicas para realizar reparos comuns? Cada ferramenta é armazenada em seu próprio local e tem a designação adequada?",g:"Lista + localização (silhueta/recorte).",m:1,e:1},
+{i:"Q6-6",t:"O local de armazenamento de cada ferramenta compartilhada é designado com alguma indicação? Os técnicos podem confirmar quem está utilizando as ferramentas compartilhadas?",g:"Local + visualização de quem está usando.",m:1,e:1},
+{i:"Q6-7",t:"O dealer / filial possui as SSTs apropriadas para atender as empilhadeiras na sua região?",g:"Lista cobre ≥80% das atividades. Ferramentas batem com a lista.",m:0,e:0},
+{i:"Q6-8",t:"Existe local para armazenagem de itens de consumo comum? O local está identificado e organizado?",g:"Local separado + ponto de reabastecimento (KANBAN).",m:1,e:1},
+{i:"Q6-9",t:"Existe carrinhos de mão usados para transportar peças pesadas na oficina?",g:"Restrições de peso + local designado.",m:0,e:0},
+{i:"Q6-10",t:"Todos os manuais estão armazenados em um local conveniente para a oficina? E eles são mantidos de forma organizada?",g:"Modelos similares agrupados com indicação.",m:0,e:1},
+{i:"Q8-1",t:"O dealer / filial faz inspeção nos equipamentos no momento do recebimento em sua unidade?",g:"Inspeções padronizadas e documentadas.",m:0,e:0},
+{i:"Q8-2",t:"A área de armazenagem de máquinas novas está bem protegida de poeira, chuva e é mantida limpa?",g:"Área protegida, limpa e designada.",m:0,e:1},
+{i:"Q8-3",t:"O dealer / filial realiza inspeção periódicas nas empilhadeiras em sua área de estoque?",g:"Inspeção mensal + procedimento + check list.",m:0,e:0},
+{i:"Q8-4",t:"O dealer / filial realiza a inspeção pré-entrega de maneira padronizada?",g:"Check list PDI com assinatura do líder.",m:0,e:1},
+{i:"Q9-3-1",t:"O dealer / filial tem programação para os técnicos de campo e internos? E estão claramente visíveis?",g:"Plano de visita e cronograma de oficina.",m:0,e:1},
+{i:"Q9-7",t:"Uma inspeção de controle de qualidade é feita após as reformas de máquinas serem concluídas na oficina?",g:"Check list de QC.",m:0,e:0},
+{i:"Q9-9-2",t:"O supervisor / gestor utiliza um relatório diário tanto dos técnicos de campo quanto dos da oficina, a fim de verificar a situação do equipamento após a manutenção?",g:"Checar relatório diário.",m:0,e:0}
+]},
+Alm:{n:"Almoxarifado",q:[
+{i:"Q6-4",t:"Tem iluminação adequada na oficina de manutenção e no almoxarifado?",g:"Iluminação + luzes portáteis.",m:0,e:1},
+{i:"Q9-11-3",t:"Todas as reivindicações de garantia são enviadas à matriz em tempo hábil?",g:"Informações básicas + motivo da garantia.",m:0,e:0},
+{i:"Q9-11-4",t:"Todas as peças em análise de garantia são armazenadas em local seguro até o julgamento final?",g:"Prateleiras designadas com dados do cliente/peça.",m:0,e:0},
+{i:"Q13-1-1",t:"O departamento de peças possui todas as ferramentas necessárias para realização das suas atividades?",g:"Catálogo, lista de preços e boletins atualizados.",m:0,e:0},
+{i:"Q13-1-2",t:"O dealer/ filial possui um procedimento padrão documentado para pedido de peças?",g:"Cronograma, cálculo, frequência e verificação de anormais.",m:0,e:0},
+{i:"Q13-1-3",t:"O dealer / filial atualiza seu sistema de peças imediatamente sempre que há informações de part number substitutos?",g:"Repassar substitutos imediatamente.",m:0,e:0},
+{i:"Q13-1-4",t:"O dealer/ filial trata separadamente seus pedidos, de acordo com a urgência?",g:"Reposição vs VOR/B.O. Procedimento escrito.",m:0,e:0},
+{i:"Q13-1-5",t:"O dealer/ filial possui um procedimento padrão para follow-up do status da entrega de pedidos atrasados, para atender back order?",g:"Procedimento de follow-up de B/O.",m:0,e:0},
+{i:"Q13-2",t:"O dealer / filial registra o lead time atual para os pedidos de peças?",g:"Registrar e refletir no cálculo. KAIZEN se variável.",m:0,e:0},
+{i:"Q13-3-1",t:"O dealer / filial coloca regularmente os pedidos de peças de reposição na matriz?",g:"Dia fixo de cada semana.",m:0,e:0},
+{i:"Q13-3-2",t:"O dealer / filial calcula os pedidos de peças de reposição de estoque baseados em critérios ou parâmetros apropriados?",g:"MIP com MAD, O/C, L/T, S/S. Atualizado mensalmente.",m:0,e:0},
+{i:"Q13-3-4",t:"O dealer / filial revisa periodicamente o histórico de demanda de itens para determinar qual item deve ser estocado?",g:"Revisão + phase-in/out.",m:0,e:0},
+{i:"Q13-3-5",t:"O dealer / filial possui uma definição sobre peças non-moving e controla o valor do estoque dessas peças?",g:"Definição + política de depreciação/descarte.",m:0,e:0},
+{i:"Q13-3-6",t:"O dealer / filial possui uma política de scrap? As peças estão sendo escarpeadas uma vez por ano conforme a política?",g:"Política escrita + sucateamento ≥1x/ano.",m:0,e:0},
+{i:"Q13-3-7",t:"O dealer / filial conhece e gerencia os números do seu service rate e stock month?",g:"Targets + atividades KAIZEN conforme matriz.",m:1,e:1},
+{i:"Q14-1",t:"O dealer / filial descarrega as peças no local mais próximo possível do almoxarifado?",g:"Local de descarregamento eficiente.",m:0,e:0},
+{i:"Q14-2",t:"O dealer / filial possui uma divisão clara das áreas de recebimento e expedição?",g:"Separação com indicação. Se limitado, indicar operação do momento.",m:0,e:1},
+{i:"Q14-3",t:"O dealer / filial realiza corretamente as operações de recebimento das peças?",g:"Procedimento + checagem no mesmo dia com packing slip.",m:0,e:0},
+{i:"Q14-4",t:"O dealer / filial atualiza o sistema de gestão do estoque imediatamente após realizada as operações de armazenamento das peças?",g:"Atualizar imediatamente. Conferir quantidades.",m:0,e:0},
+{i:"Q14-5",t:"O dealer / filial realiza operações de pré-picking de peças para os técnicos?",g:"Pré-picking alinhado ao horário e OS.",m:0,e:1},
+{i:"Q14-6",t:"O dealer / filial possui prateleiras / área específicas para peças de pedidos especiais?",g:"Área B/O, VOR, Campanha. Follow-up diário.",m:0,e:1},
+{i:"Q14-7",t:"O dealer / filial utiliza cestas ou carrinhos para separar / armazenar as peças?",g:"Cestas/carrinhos com local designado.",m:0,e:1},
+{i:"Q14-8",t:"O dealer / filial armazena as peças da seguinte forma: um part number uma locação?",g:"Uma locação por part number.",m:1,e:1},
+{i:"Q14-9",t:"O dealer / filial armazena peças pesadas nas prateleiras médias ou inferiores?",g:"Pesadas no meio/inferiores.",m:0,e:1},
+{i:"Q14-11",t:"O dealer / filial armazena as peças de alto giro próximas da área de recebimento ou de expedição?",g:"Alto giro próximo. Revisão periódica.",m:0,e:0},
+{i:"Q14-12",t:"O dealer/ filial armazena as peças do mesmo tipo e formato próximas uma das outras? Elas estão visivelmente separadas?",g:"Mesmo tipo agrupado + separação visual.",m:0,e:1},
+{i:"Q14-13",t:"O dealer / filial utiliza o método de armazenamento vertical?",g:"Armazenamento vertical conforme formato.",m:0,e:1},
+{i:"Q14-14",t:"O dealer / filial consegue saber de forma visual movimentações irregulares incluindo o overstock?",g:"Indicação visual + motivo + contramedida.",m:0,e:1},
+{i:"Q14-15",t:"O dealer / filial utiliza um método FIFO (First-in / First-out) na armazenagem das peças?",g:"FIFO com indicações visuais.",m:0,e:1},
+{i:"Q14-16",t:"O dealer / filial faz revisões regularmente das locações das peças?",g:"Revisão considerando demanda e 7 técnicas.",m:0,e:0},
+{i:"Q14-17",t:"O dealer / filial não armazena peças no corredor, diretamente no chão e não estão saindo das prateleiras?",g:"Proibido corredor/chão. Peças dentro das prateleiras.",m:1,e:1},
+{i:"Q15-1",t:"O dealer/ filial informa devidamente o departamento de serviços, o horário de corte para os pedidos de peças? A informação está visível em um local onde todos possam ver?",g:"Horário de corte visível e atualizado.",m:0,e:1},
+{i:"Q15-2",t:"O dealer / filial possui um balcão de peças separado e exclusivo para os técnicos?",g:"Balcão exclusivo para técnicos.",m:0,e:1},
+{i:"Q15-3",t:"O departamento de peças tem uma comunicação regular com o departamento de serviços?",g:"Reuniões mensais/semanais.",m:0,e:0},
+{i:"Q15-4",t:"O departamento de serviços notifica os clientes e reprograma os compromissos quando o ETA (Tempo Estimado de Chegada) muda?",g:"Peças informa Serviços imediatamente. Procedimento documentado.",m:0,e:0}
+]}
+};
+const DESC = {
+  RH: "Organograma, mapa de habilidades e programas motivacionais",
+  Seg: "Segurança do trabalho, EPIs, meio ambiente e prevenção de acidentes",
+  Pos: "Atendimento, ordens de serviço, contratos e satisfação do cliente",
+  Ofi: "Organização, limpeza, ferramentas e infraestrutura da oficina",
+  Alm: "Estoque, armazenagem, peças e logística do almoxarifado"
+};
+
+let currentArea = null;
+let editingHistoryId = null;
+const ans = {};
+
+/* ===================== RASCUNHO AUTOMÁTICO (IndexedDB) ===================== */
+const DRAFT_DB_NAME = "carmak_asec_draft_v1";
+const DRAFT_STORE = "drafts";
+const DRAFT_KEY = "current";
+let _draftTimer = null;
+let _draftSaving = false;
+
+function openDraftDB() {
+  return new Promise((resolve, reject) => {
+    try {
+      const req = indexedDB.open(DRAFT_DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(DRAFT_STORE)) db.createObjectStore(DRAFT_STORE);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error("IndexedDB indisponível"));
+    } catch (e) { reject(e); }
+  });
+}
+function idbPut(value) {
+  return openDraftDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(DRAFT_STORE, "readwrite");
+    tx.objectStore(DRAFT_STORE).put(value, DRAFT_KEY);
+    tx.oncomplete = () => { db.close(); resolve(true); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  }));
+}
+function idbGet() {
+  return openDraftDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(DRAFT_STORE, "readonly");
+    const req = tx.objectStore(DRAFT_STORE).get(DRAFT_KEY);
+    req.onsuccess = () => { db.close(); resolve(req.result || null); };
+    req.onerror = () => { db.close(); reject(req.error); };
+  }));
+}
+function idbClear() {
+  return openDraftDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(DRAFT_STORE, "readwrite");
+    tx.objectStore(DRAFT_STORE).delete(DRAFT_KEY);
+    tx.oncomplete = () => { db.close(); resolve(true); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  })).catch(() => false);
+}
+function draftMeta() {
+  return {
+    auditor: (document.getElementById("auditorName") || {}).value || "",
+    dealer: (document.getElementById("dealerName") || {}).value || "",
+    date: (document.getElementById("auditDate") || {}).value || "",
+    notes: (document.getElementById("generalNotes") || {}).value || ""
+  };
+}
+function buildDraftPayload() {
+  if (!currentArea || readOnly) return null;
+  const areaAns = Object.fromEntries(
+    Object.entries(ans).filter(([k]) => k.startsWith(currentArea + "_"))
+  );
+  const hasContent = Object.keys(areaAns).some(k => {
+    const a = areaAns[k];
+    return a && (a.s || (a.just && String(a.just).trim()) || (a.imgs && a.imgs.length));
+  });
+  if (!hasContent && !draftMeta().notes) return null;
+  return {
+    v: 1,
+    savedAt: new Date().toISOString(),
+    area: currentArea,
+    areaName: (A[currentArea] && A[currentArea].n) || currentArea,
+    meta: draftMeta(),
+    answers: areaAns,
+    editingHistoryId: editingHistoryId || null
+  };
+}
+function setDraftChip(state, text) {
+  const el = document.getElementById("draftChip");
+  if (!el) return;
+  if (!state) { el.style.display = "none"; return; }
+  el.style.display = "inline-flex";
+  el.className = "draft-chip" + (state === "ok" ? " ok" : state === "warn" ? " warn" : "");
+  el.textContent = text || "Rascunho";
+}
+function formatDraftTime(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  } catch (e) { return ""; }
+}
+async function saveDraftNow() {
+  if (typeof isMaster === "function" && !isMaster()) return;
+  if (readOnly || !currentArea) return;
+  if (_draftSaving) return;
+  const payload = buildDraftPayload();
+  if (!payload) return;
+  _draftSaving = true;
+  setDraftChip("", "Salvando…");
+  try {
+    await idbPut(payload);
+    setDraftChip("ok", "Rascunho · " + formatDraftTime(payload.savedAt));
+  } catch (e) {
+    console.warn("Falha ao salvar rascunho", e);
+    try {
+      const slim = JSON.parse(JSON.stringify(payload));
+      Object.keys(slim.answers || {}).forEach(k => {
+        if (slim.answers[k] && slim.answers[k].imgs) slim.answers[k].imgs = [];
+      });
+      slim.photosStripped = true;
+      await idbPut(slim);
+      setDraftChip("warn", "Rascunho (sem fotos) · " + formatDraftTime(slim.savedAt));
+    } catch (e2) {
+      setDraftChip("warn", "Rascunho falhou");
+    }
+  } finally {
+    _draftSaving = false;
+  }
+}
+function scheduleDraftSave(delay) {
+  if (typeof isMaster === "function" && !isMaster()) return;
+  if (readOnly || !currentArea) return;
+  clearTimeout(_draftTimer);
+  _draftTimer = setTimeout(() => { saveDraftNow(); }, delay == null ? 800 : delay);
+}
+async function clearDraft() {
+  clearTimeout(_draftTimer);
+  try { await idbClear(); } catch (e) {}
+  setDraftChip(null);
+}
+async function getDraft() {
+  try { return await idbGet(); } catch (e) { return null; }
+}
+function applyDraft(d) {
+  if (!d || !d.area || !A[d.area]) return false;
+  currentArea = d.area;
+  editingHistoryId = d.editingHistoryId || null;
+  readOnly = false;
+  document.body.classList.remove("readonly-mode");
+  ["auditorName","dealerName","auditDate","generalNotes"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = false;
+  });
+  if (d.meta) {
+    if (d.meta.auditor != null) document.getElementById("auditorName").value = d.meta.auditor;
+    if (d.meta.dealer != null) document.getElementById("dealerName").value = d.meta.dealer;
+    if (d.meta.date != null) document.getElementById("auditDate").value = d.meta.date;
+    if (d.meta.notes != null) document.getElementById("generalNotes").value = d.meta.notes;
+  }
+  Object.keys(ans).forEach(k => { if (k.startsWith(d.area + "_")) delete ans[k]; });
+  if (d.answers) Object.assign(ans, d.answers);
+  document.getElementById("areaTitle").textContent = A[d.area].n + " (rascunho)";
+  renderQuestions(d.area);
+  updateAreaScore();
+  showView("checklist");
+  const when = formatDraftTime(d.savedAt);
+  setDraftChip(d.photosStripped ? "warn" : "ok", (d.photosStripped ? "Rascunho sem fotos · " : "Rascunho · ") + when);
+  const cont = document.getElementById("questionsContainer");
+  if (cont) {
+    const old = document.getElementById("draftBanner");
+    if (old) old.remove();
+    const ban = document.createElement("div");
+    ban.className = "draft-banner";
+    ban.id = "draftBanner";
+    ban.innerHTML = "<span>Continuando rascunho salvo em <b>" + when + "</b>" +
+      (d.photosStripped ? " (fotos não puderam ser guardadas no aparelho)." : ".") +
+      "</span>" +
+      '<button type="button" class="sec" onclick="discardDraftAndRestart()">Descartar rascunho</button>';
+    cont.insertBefore(ban, cont.firstChild);
+  }
+  return true;
+}
+async function discardDraftAndRestart() {
+  if (!confirm("Descartar o rascunho e limpar as respostas desta área?")) return;
+  const area = currentArea;
+  await clearDraft();
+  Object.keys(ans).forEach(k => { if (area && k.startsWith(area + "_")) delete ans[k]; });
+  editingHistoryId = null;
+  const ban = document.getElementById("draftBanner");
+  if (ban) ban.remove();
+  if (area) {
+    document.getElementById("areaTitle").textContent = A[area].n;
+    renderQuestions(area);
+    updateAreaScore();
+  }
+}
+async function offerRestoreDraftOnEnter() {
+  const d = await getDraft();
+  if (!d || !d.area || !A[d.area]) return;
+  // só sugere se master
+  if (typeof isMaster === "function" && !isMaster()) return;
+  const when = formatDraftTime(d.savedAt);
+  const name = d.areaName || d.area;
+  const dealer = (d.meta && d.meta.dealer) || "—";
+  const ok = confirm(
+    "Há um rascunho de auditoria em andamento:\\n\\n" +
+    "Área: " + name + "\\n" +
+    "Dealer: " + dealer + "\\n" +
+    "Salvo em: " + when + "\\n\\n" +
+    "Deseja continuar de onde parou?"
+  );
+  if (ok) applyDraft(d);
+  else if (confirm("Apagar este rascunho do aparelho?")) await clearDraft();
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") saveDraftNow();
+});
+window.addEventListener("pagehide", () => { saveDraftNow(); });
+
+
+
+/* ===================== AUTH ===================== */
+
+/* ===================== Cronograma ===================== */
+const FOCAIS = {
+  "Matriz - São Leopoldo RS": {
+    RH: "Siluana Scharlau", Seg: "Thais Raupp", Pos: "Vagner Dutra",
+    Ofi: "Nicolas Bayer", Alm: "Julio Correa"
+  },
+  "Filial - Itajaí SC": {
+    RH: "Siluana Scharlau", Seg: "Vitor Beulke", Pos: "Luis Henrique",
+    Ofi: "Vitor Beulke", Alm: "Juliana Tasso"
+  }
+};
+const DEALERS_CRONO = ["Matriz - São Leopoldo RS", "Filial - Itajaí SC"];
+const AREA_COLORS = {
+  RH: "#2F6B9A",
+  Seg: "#C6483E",
+  Pos: "#6B4C9A",
+  Ofi: "#1F7A5C",
+  Alm: "#C4A35A"
+};
+let cronoRows = [];
+let cronoDealerFilter = "";
+let cronoYear = new Date().getFullYear();
+let cronoMonth = new Date().getMonth(); // 0-11
+let cronoLoading = false;
+
+function mapCronoRow(row) {
+  return {
+    id: row.id,
+    dealer: row.dealer,
+    area: row.area,
+    focal: row.focal || "",
+    date: row.scheduled_date,
+    time: row.scheduled_time ? String(row.scheduled_time).slice(0, 5) : "",
+    mode: row.mode || "Presencial",
+    notes: row.notes || ""
+  };
+}
+
+async function loadCrono() {
+  try {
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("cronograma")
+        .select("id, dealer, area, focal, scheduled_date, scheduled_time, mode, notes")
+        .order("scheduled_date", { ascending: true });
+      if (error) throw error;
+      cronoRows = (data || []).map(mapCronoRow).filter(r => r.date);
+      return;
+    }
+    var data = await restQuery(
+      "/rest/v1/cronograma?select=id,dealer,area,focal,scheduled_date,scheduled_time,mode,notes&order=scheduled_date.asc"
+    );
+    cronoRows = (data || []).map(mapCronoRow).filter(r => r.date);
+  } catch (e) {
+    console.error(e);
+    cronoRows = [];
+    alert("Erro ao carregar cronograma: " + (e.message || e));
+  }
+}
+
+function visibleCronoRows() {
+  let rows = cronoRows.filter(r => r.date);
+  if (currentUser && currentUser.role === "viewer") {
+    rows = rows.filter(r => r.area === currentUser.area);
+  }
+  if (cronoDealerFilter) rows = rows.filter(r => r.dealer === cronoDealerFilter);
+  return rows;
+}
+
+function setCronoDealerFilter(v) {
+  cronoDealerFilter = v || "";
+  renderCrono();
+}
+
+function cronoShiftMonth(delta) {
+  cronoMonth += delta;
+  if (cronoMonth > 11) { cronoMonth = 0; cronoYear++; }
+  if (cronoMonth < 0) { cronoMonth = 11; cronoYear--; }
+  renderCrono();
+}
+
+function cronoGoToday() {
+  const n = new Date();
+  cronoYear = n.getFullYear();
+  cronoMonth = n.getMonth();
+  renderCrono();
+}
+
+function fillCronoAreaSelect() {
+  const sel = document.getElementById("cronoF_area");
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = Object.keys(A).map(k =>
+    `<option value="${k}">${A[k].n}</option>`
+  ).join("");
+  if (cur && A[cur]) sel.value = cur;
+}
+
+function autoFocal() {
+  const d = document.getElementById("cronoF_dealer")?.value;
+  const a = document.getElementById("cronoF_area")?.value;
+  const f = document.getElementById("cronoF_focal");
+  if (f && d && a && FOCAIS[d] && FOCAIS[d][a]) f.value = FOCAIS[d][a];
+}
+
+function resetCronoForm() {
+  const idEl = document.getElementById("cronoEditId");
+  if (idEl) idEl.value = "";
+  const t = document.getElementById("cronoFormTitle");
+  if (t) t.textContent = "Nova auditoria";
+  const date = document.getElementById("cronoF_date");
+  if (date) date.value = "";
+  const notes = document.getElementById("cronoF_notes");
+  if (notes) notes.value = "";
+  const mode = document.getElementById("cronoF_mode");
+  if (mode) mode.value = "Presencial";
+  const time = document.getElementById("cronoF_time");
+  if (time) time.value = "09:00";
+  autoFocal();
+}
+
+function editCronoEvent(id) {
+  if (!isMaster()) return;
+  const r = cronoRows.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById("cronoEditId").value = r.id;
+  document.getElementById("cronoFormTitle").textContent = "Editar auditoria";
+  document.getElementById("cronoF_dealer").value = r.dealer;
+  document.getElementById("cronoF_area").value = r.area;
+  document.getElementById("cronoF_focal").value = r.focal || "";
+  document.getElementById("cronoF_date").value = r.date || "";
+  document.getElementById("cronoF_time").value = r.time || "09:00";
+  document.getElementById("cronoF_mode").value = r.mode || "Presencial";
+  document.getElementById("cronoF_notes").value = r.notes || "";
+  document.querySelector(".crono-form")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+async function submitCronoForm() {
+  if (!isMaster()) { alert("Somente Qualidade pode editar o cronograma."); return; }
+  const dealer = document.getElementById("cronoF_dealer").value;
+  const area = document.getElementById("cronoF_area").value;
+  const focal = document.getElementById("cronoF_focal").value.trim();
+  const date = document.getElementById("cronoF_date").value;
+  const time = document.getElementById("cronoF_time").value || null;
+  const mode = document.getElementById("cronoF_mode").value;
+  const notes = document.getElementById("cronoF_notes").value.trim();
+  if (!dealer || !area || !date) {
+    alert("Preencha dealer, área e data.");
+    return;
+  }
+  const payload = {
+    dealer: dealer,
+    area: area,
+    focal: focal || null,
+    scheduled_date: date,
+    scheduled_time: time || null,
+    mode: mode || "Presencial",
+    notes: notes || null,
+    created_by: currentUser && currentUser.id ? currentUser.id : null
+  };
+  const editId = document.getElementById("cronoEditId").value;
+  try {
+    if (supabase) {
+      if (editId) {
+        const { error } = await supabase.from("cronograma").update(payload).eq("id", editId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("cronograma").insert(payload);
+        if (error) throw error;
+      }
+    } else {
+      if (editId) {
+        await restQuery("/rest/v1/cronograma?id=eq." + encodeURIComponent(editId), {
+          method: "PATCH",
+          body: payload
+        });
+      } else {
+        await restQuery("/rest/v1/cronograma", {
+          method: "POST",
+          body: payload,
+          prefer: "return=minimal"
+        });
+      }
+    }
+    resetCronoForm();
+    await renderCrono();
+  } catch (e) {
+    console.error(e);
+    alert("Erro ao salvar no cronograma: " + (e.message || e));
+  }
+}
+
+async function delCronoRow(id) {
+  if (!isMaster()) return;
+  if (!confirm("Remover esta auditoria do cronograma?")) return;
+  try {
+    if (supabase) {
+      const { error } = await supabase.from("cronograma").delete().eq("id", id);
+      if (error) throw error;
+    } else {
+      await restQuery("/rest/v1/cronograma?id=eq." + encodeURIComponent(id), { method: "DELETE" });
+    }
+    if (document.getElementById("cronoEditId")?.value === id) resetCronoForm();
+    await renderCrono();
+  } catch (e) {
+    console.error(e);
+    alert("Erro ao remover: " + (e.message || e));
+  }
+}
+
+async function renderCrono() {
+  if (cronoLoading) return;
+  cronoLoading = true;
+  try {
+    await loadCrono();
+  } finally {
+    cronoLoading = false;
+  }
+  fillCronoAreaSelect();
+
+  // dealer tabs
+  const tabs = document.getElementById("cronoDealerTabs");
+  if (tabs) {
+    const opts = [
+      { v: "", l: "Todos" },
+      { v: "Matriz - São Leopoldo RS", l: "Matriz · São Leopoldo RS" },
+      { v: "Filial - Itajaí SC", l: "Filial · Itajaí SC" }
+    ];
+    tabs.innerHTML = opts.map(o =>
+      `<button type="button" class="${cronoDealerFilter===o.v?"on":""}" data-dealer="${o.v.replace(/"/g,"&quot;")}" onclick="setCronoDealerFilter(this.getAttribute('data-dealer'))">${o.l}</button>`
+    ).join("");
+  }
+
+  // legend
+  const leg = document.getElementById("cronoAreaLegend");
+  if (leg) {
+    leg.innerHTML = Object.keys(A).map(k =>
+      `<span class="lg"><span class="dot" style="background:${AREA_COLORS[k]||'#888'}"></span>${A[k].n}</span>`
+    ).join("");
+  }
+
+  const months = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  const label = document.getElementById("cronoMonthLabel");
+  if (label) label.textContent = months[cronoMonth] + " " + cronoYear;
+
+  const grid = document.getElementById("cronoGrid");
+  if (!grid) return;
+
+  const first = new Date(cronoYear, cronoMonth, 1);
+  const startPad = first.getDay(); // 0=Sun
+  const daysInMonth = new Date(cronoYear, cronoMonth + 1, 0).getDate();
+  const prevDays = new Date(cronoYear, cronoMonth, 0).getDate();
+
+  const today = new Date();
+  const tY = today.getFullYear(), tM = today.getMonth(), tD = today.getDate();
+
+  const rows = visibleCronoRows();
+  const byDate = {};
+  rows.forEach(r => {
+    if (!byDate[r.date]) byDate[r.date] = [];
+    byDate[r.date].push(r);
+  });
+  Object.keys(byDate).forEach(k => {
+    byDate[k].sort((a,b) => (a.time||"99:99").localeCompare(b.time||"99:99"));
+  });
+
+  let htmlDays = "";
+  // previous month pad
+  for (let i = 0; i < startPad; i++) {
+    const d = prevDays - startPad + i + 1;
+    htmlDays += `<div class="crono-day out"><div class="dn">${d}</div></div>`;
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = cronoYear + "-" + String(cronoMonth+1).padStart(2,"0") + "-" + String(d).padStart(2,"0");
+    const isToday = (cronoYear===tY && cronoMonth===tM && d===tD);
+    const evs = byDate[iso] || [];
+    const chips = evs.map(r => {
+      const short = ((A[r.area] && A[r.area].n) || r.area).split(" ")[0];
+      const tm = r.time ? r.time : "";
+      const label = tm ? (tm + " " + short) : short;
+      const tip = ((A[r.area] && A[r.area].n) || r.area) + (tm ? " · " + tm : "") + " · " + (r.dealer||"").replace("Matriz - ","").replace("Filial - ","") + " · " + (r.mode||"");
+      return `<button type="button" class="crono-ev" style="background:${AREA_COLORS[r.area]||'#555'}" title="${tip.replace(/"/g,'&quot;')}" onclick="editCronoEvent('${r.id}')">${label}</button>`;
+    }).join("");
+    htmlDays += `<div class="crono-day${isToday?" today":""}"><div class="dn">${d}</div>${chips}</div>`;
+  }
+  // next month pad to complete weeks
+  const totalCells = startPad + daysInMonth;
+  const rem = (7 - (totalCells % 7)) % 7;
+  for (let i = 1; i <= rem; i++) {
+    htmlDays += `<div class="crono-day out"><div class="dn">${i}</div></div>`;
+  }
+  grid.innerHTML = htmlDays;
+
+  // month list
+  const list = document.getElementById("cronoMonthList");
+  if (list) {
+    const monthRows = rows
+      .filter(r => r.date && r.date.startsWith(cronoYear + "-" + String(cronoMonth+1).padStart(2,"0")))
+      .sort((a,b) => (a.date + (a.time||"")).localeCompare(b.date + (b.time||"")));
+    if (!monthRows.length) {
+      list.innerHTML = '<p style="color:var(--m);font-size:.85rem;margin:0">Nenhuma auditoria neste mês.</p>';
+    } else {
+      const canEdit = isMaster();
+      list.innerHTML = monthRows.map(r => {
+        const nome = (A[r.area] && A[r.area].n) || r.area;
+        const parts = r.date.split("-");
+        const ds = parts[2] + "/" + parts[1];
+        const tm = r.time ? r.time : "";
+        const dealerShort = (r.dealer||"").replace("Matriz - ","Matriz · ").replace("Filial - ","Filial · ");
+        return `<div class="crono-list-item">
+          <div class="bar" style="background:${AREA_COLORS[r.area]||'#888'}"></div>
+          <div class="meta" ${canEdit?`style="cursor:pointer" onclick="editCronoEvent('${r.id}')"`:""}>
+            <strong>${ds}${tm ? " · " + tm : ""} · ${nome}</strong>
+            <span>${dealerShort} · ${r.focal||"—"} · ${r.mode||"Presencial"}</span>
+          </div>
+          ${canEdit?`<button type="button" class="rm" onclick="delCronoRow('${r.id}')">Excluir</button>`:""}
+        </div>`;
+      }).join("");
+    }
+  }
+
+  // bind form auto focal once
+  const dSel = document.getElementById("cronoF_dealer");
+  const aSel = document.getElementById("cronoF_area");
+  if (dSel && !dSel._cronoBound) {
+    dSel.addEventListener("change", autoFocal);
+    dSel._cronoBound = true;
+  }
+  if (aSel && !aSel._cronoBound) {
+    aSel.addEventListener("change", autoFocal);
+    aSel._cronoBound = true;
+  }
+  if (isMaster() && !document.getElementById("cronoEditId")?.value) autoFocal();
+}
+
+
+// Auth (doLogin, supabase, currentUser) está no bloco <script> anterior
+
+function enterApp() {
+  document.getElementById("login-screen").classList.add("hidden");
+  document.getElementById("app-root").classList.remove("hidden");
+  document.getElementById("userChip").textContent = (currentUser && (currentUser.label || currentUser.email)) || "—";
+
+  var isViewer = currentUser && currentUser.role === "viewer";
+  document.body.classList.toggle("viewer-mode", isViewer);
+
+  var filterBar = document.getElementById("histFilterBar");
+  if (filterBar) filterBar.style.display = isViewer ? "none" : "flex";
+  if (typeof populateHistFilter === "function") populateHistFilter();
+
+  if (isViewer) {
+    showView("history");
+  } else {
+    showView("select");
+  }
+}
+
+function populateHistFilter() {
+  var sel = document.getElementById("histAreaFilter");
+  if (!sel) return;
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">Todas as áreas</option>' +
+    Object.keys(A).map(function(k){ return '<option value="'+k+'">'+A[k].n+'</option>'; }).join("");
+  if (cur) sel.value = cur;
+}
+
+
+document.getElementById("auditDate").valueAsDate = new Date();
+
+function initAreaCards() {
+  const grid = document.getElementById("areaGrid");
+  grid.innerHTML = "";
+  Object.keys(A).forEach(k => {
+    const a = A[k];
+    const card = document.createElement("div");
+    card.className = "area-card";
+    card.innerHTML = `<div class="icon">${ICONS[k]||"📋"}</div><div class="info"><h3>${a.n}</h3><p>${DESC[k]||""}</p><span class="cnt">${a.q.length} itens</span></div>`;
+    card.onclick = () => startArea(k);
+    grid.appendChild(card);
+  });
+}
+
+async function startArea(key) {
+  if (!isMaster()) {
+    alert("Apenas o perfil Qualidade pode iniciar novas auditorias.");
+    showView("history");
+    return;
+  }
+  if (!A[key]) return;
+  const auditor = document.getElementById("auditorName").value.trim();
+  const dealer = document.getElementById("dealerName").value.trim();
+  if (!auditor || !dealer) {
+    alert("Preencha o Nome do Auditor e o Dealer / Filial antes de iniciar.");
+    return;
+  }
+  try {
+    const d = await getDraft();
+    if (d && d.area === key) {
+      const when = formatDraftTime(d.savedAt);
+      const ok = confirm("Existe rascunho desta área salvo em " + when + ".\n\nContinuar de onde parou?");
+      if (ok) { applyDraft(d); return; }
+      if (confirm("Apagar o rascunho antigo desta área?")) await clearDraft();
+    }
+  } catch (e) {}
+  currentArea = key;
+  editingHistoryId = null;
+  readOnly = false;
+  document.body.classList.remove("readonly-mode");
+  ["auditorName","dealerName","auditDate","generalNotes"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = false;
+  });
+  Object.keys(ans).forEach(k => { if (k.startsWith(key + "_")) delete ans[k]; });
+  document.getElementById("areaTitle").textContent = A[key].n;
+  const ban = document.getElementById("draftBanner");
+  if (ban) ban.remove();
+  renderQuestions(key);
+  updateAreaScore();
+  showView("checklist");
+  setDraftChip(null);
+}
+
+function renderQuestions(key) {
+  const oldBan = document.getElementById("readonlyBanner"); if (oldBan) oldBan.remove();
+
+  const cont = document.getElementById("questionsContainer");
+  cont.innerHTML = "";
+  A[key].q.forEach(q => {
+    const a = ans[key + "_" + q.i] || {};
+    const c = document.createElement("div");
+    c.className = "qc" + (a.s === "ok" ? " ok" : a.s === "nok" ? " nok" : "");
+    c.id = "c-" + key + "-" + q.i;
+    let bd = "";
+    if (q.m) bd += '<span class="bd bm">Mandatório</span>';
+    if (q.e) bd += '<span class="bd be">Evidenciável</span>';
+    const ro = !!readOnly;
+    const dis = ro ? "disabled" : "";
+    const ocOk = ro ? "" : `onchange="setA('${key}','${q.i}','ok')"`;
+    const ocNok = ro ? "" : `onchange="setA('${key}','${q.i}','nok')"`;
+    const oiJust = ro ? "" : `oninput="saveJust('${key}','${q.i}',this.value)"`;
+    const ocFile = ro ? "" : `onchange="hF('${key}','${q.i}',this)"`;
+    c.innerHTML = `
+      <div class="qh">
+        <span class="qcde">${q.i}</span>
+        <span class="qtx">${q.t}</span>
+        <div class="bdg">${bd}</div>
+      </div>
+      ${q.g ? `<div class="gd">${q.g}</div>` : ""}
+      <div class="ar">
+        <div class="rg">
+          <label class="ol"><input type="radio" name="${key}_${q.i}" value="ok" ${a.s==="ok"?"checked":""} ${dis} ${ocOk}> Conforme</label>
+          <label class="nl"><input type="radio" name="${key}_${q.i}" value="nok" ${a.s==="nok"?"checked":""} ${dis} ${ocNok}> Não Conforme</label>
+        </div>
+        <div class="just-box ${a.s==="nok"?"show":""}" id="just-wrap-${key}-${q.i}">
+          <label>Motivo da Não Conformidade *</label>
+          <textarea id="just-${key}-${q.i}" placeholder="Descreva o motivo da não conformidade..." ${dis} ${oiJust} ${ro ? "readonly" : ""}>${a.just||""}</textarea>
+        </div>
+        <div class="eb">
+          ${ro ? "" : `<label class="add-photo-btn" for="f-${key}-${q.i}">📷 Adicionar Fotos</label>
+          <input type="file" accept="image/*" multiple capture="environment" id="f-${key}-${q.i}" ${ocFile} style="display:none">`}
+          <span class="photo-count" id="cnt-${key}-${q.i}"></span>
+          <div class="gallery" id="gal-${key}-${q.i}"></div>
+        </div>
+      </div>`;
+    cont.appendChild(c);
+    renderGallery(key, q.i);
+  });
+}
+
+function saveJust(k, i, val) {
+  const key = k + "_" + i;
+  if (readOnly || (currentUser && currentUser.role === "viewer")) return;
+  if (!ans[key]) ans[key] = { s: null, imgs: [], just: "" };
+  ans[key].just = val;
+  scheduleDraftSave(1200);
+}
+
+function setA(k, i, s) {
+  const key = k + "_" + i;
+  if (readOnly || (currentUser && currentUser.role === "viewer")) return;
+  if (!ans[key]) ans[key] = { s: null, imgs: [], just: "" };
+  ans[key].s = s;
+  const c = document.getElementById("c-" + k + "-" + i);
+  c.classList.remove("ok", "nok");
+  if (s === "ok") c.classList.add("ok");
+  if (s === "nok") c.classList.add("nok");
+  const justWrap = document.getElementById("just-wrap-" + k + "-" + i);
+  if (justWrap) {
+    if (s === "nok") justWrap.classList.add("show");
+    else {
+      justWrap.classList.remove("show");
+      ans[key].just = "";
+      const ta = document.getElementById("just-" + k + "-" + i);
+      if (ta) ta.value = "";
+    }
+  }
+  updateAreaScore();
+  scheduleDraftSave();
+}
+
+/* Compressão agressiva para WhatsApp / e-mail / Teams (PDF leve) */
+const IMG_MAX_SIDE_STORE = 960;   // ao anexar no checklist
+const IMG_QUALITY_STORE = 0.58;
+const IMG_MAX_SIDE_PDF = 720;     // ao gerar o PDF
+const IMG_QUALITY_PDF = 0.48;
+const IMG_MAX_PER_ITEM = 5;       // limite por pergunta
+
+function compressDataUrl(dataUrl, maxSide, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      const side = Math.max(w, h);
+      if (side > maxSide) {
+        const r = maxSide / side;
+        w = Math.round(w * r);
+        h = Math.round(h * r);
+      }
+      // evita imagens minúsculas inválidas
+      w = Math.max(w, 1);
+      h = Math.max(h, 1);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+function compressImage(file, maxSide = IMG_MAX_SIDE_STORE, quality = IMG_QUALITY_STORE) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      compressDataUrl(e.target.result, maxSide, quality).then(resolve).catch(reject);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/** Recomprime imagens já anexadas para o PDF (garante tamanho final pequeno). */
+async function prepareImagesForPdf(imgs) {
+  const out = [];
+  for (const im of (imgs || [])) {
+    if (!im || !im.data) continue;
+    try {
+      const data = await compressDataUrl(im.data, IMG_MAX_SIDE_PDF, IMG_QUALITY_PDF);
+      out.push({ data, name: im.name || "foto.jpg" });
+    } catch (e) {
+      // se falhar, tenta original só se for JPEG pequeno
+      if (typeof im.data === "string" && im.data.indexOf("data:image/jpeg") === 0 && im.data.length < 350000) {
+        out.push(im);
+      }
+    }
+  }
+  return out;
+}
+
+async function hF(k, i, inp) {
+  const key = k + "_" + i;
+  if (readOnly || (currentUser && currentUser.role === "viewer")) { if (inp) inp.value = ""; return; }
+  if (!ans[key]) ans[key] = { s: null, imgs: [], just: "" };
+  if (!ans[key].imgs) ans[key].imgs = [];
+  const room = IMG_MAX_PER_ITEM - ans[key].imgs.length;
+  if (room <= 0) {
+    alert("Limite de " + IMG_MAX_PER_ITEM + " fotos por item. Remova alguma antes de adicionar.");
+    inp.value = "";
+    return;
+  }
+  const files = Array.from(inp.files || []).slice(0, room);
+  for (const f of files) {
+    if (!f.type || !f.type.startsWith("image/")) continue;
+    try {
+      const data = await compressImage(f);
+      ans[key].imgs.push({ data, name: (f.name || "foto").replace(/\.[^.]+$/, "") + ".jpg" });
+    } catch (e) {
+      console.warn("Falha ao comprimir imagem", f.name, e);
+    }
+  }
+  if ((inp.files || []).length > room) {
+    alert("Apenas " + room + " foto(s) adicionada(s) (máx. " + IMG_MAX_PER_ITEM + " por item).");
+  }
+  inp.value = "";
+  renderGallery(k, i);
+  scheduleDraftSave(400);
+}
+
+function renderGallery(k, i) {
+  const key = k + "_" + i;
+  const imgs = (ans[key] && ans[key].imgs) || [];
+  const g = document.getElementById("gal-" + k + "-" + i);
+  if (!g) return;
+  g.innerHTML = imgs.map((im, idx) => `
+    <div class="thumb">
+      <img src="${im.data}" alt="Evidência" onclick="openLightbox('${k}','${i}',${idx})">
+      ${readOnly ? "" : `<button type="button" class="rm" onclick="event.stopPropagation();removeImg('${k}','${i}',${idx})">×</button>`}
+    </div>`).join("");
+  const cnt = document.getElementById("cnt-" + k + "-" + i);
+  if (cnt) cnt.textContent = imgs.length ? imgs.length + " foto" + (imgs.length > 1 ? "s" : "") + " anexada" + (imgs.length > 1 ? "s" : "") : "Nenhuma foto anexada";
+}
+
+function removeImg(k, i, idx) {
+  const key = k + "_" + i;
+  if (readOnly || (currentUser && currentUser.role === "viewer")) return;
+  if (!ans[key] || !ans[key].imgs) return;
+  ans[key].imgs.splice(idx, 1);
+  renderGallery(k, i);
+  scheduleDraftSave(400);
+}
+
+function openLightbox(k, i, idx) {
+  const key = k + "_" + i;
+  const imgs = (ans[key] && ans[key].imgs) || [];
+  if (!imgs[idx]) return;
+  document.getElementById("lightboxImg").src = imgs[idx].data;
+  document.getElementById("lightbox").classList.add("show");
+}
+function closeLightbox() {
+  document.getElementById("lightbox").classList.remove("show");
+}
+
+function calc(k) {
+  const qs = A[k].q;
+  let an = 0, ok = 0;
+  qs.forEach(q => {
+    const a = ans[k + "_" + q.i];
+    if (a && a.s) { an++; if (a.s === "ok") ok++; }
+  });
+  if (an === 0) return { p: null, ok: 0, t: qs.length, an: 0 };
+  return { p: Math.round(ok / an * 100), ok, t: qs.length, an };
+}
+
+function updateAreaScore() {
+  if (!currentArea) return;
+  const s = calc(currentArea);
+  document.getElementById("areaScore").textContent = s.p === null ? "—" : s.p + "%";
+}
+
+function showView(v) {
+  if (currentUser && currentUser.role === "viewer" && v === "select") {
+    v = "history";
+  }
+  document.getElementById("view-select").classList.toggle("on", v === "select");
+  document.getElementById("view-checklist").classList.toggle("on", v === "checklist");
+  document.getElementById("view-history").classList.toggle("on", v === "history");
+  const vc = document.getElementById("view-crono"); if (vc) vc.classList.toggle("on", v === "crono");
+  const btnNova = document.getElementById("btnNova");
+  if (btnNova) btnNova.classList.toggle("on", v === "select" || v === "checklist");
+  document.getElementById("btnHist").classList.toggle("on", v === "history");
+  const bc = document.getElementById("btnCrono"); if (bc) bc.classList.toggle("on", v === "crono");
+  if (v === "crono") renderCrono();
+  if (v === "history") {
+    readOnly = false;
+    document.body.classList.remove("readonly-mode");
+    ["auditorName","dealerName","auditDate","generalNotes"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = false;
+    });
+    renderHistory();
+  }
+}
+
+function mapAuditRow(row) {
+  return {
+    id: row.id,
+    area: row.area,
+    areaName: row.area_name,
+    auditor: row.auditor,
+    dealer: row.dealer,
+    date: row.audit_date,
+    notes: row.notes,
+    score: row.score != null ? Number(row.score) : null,
+    answered: row.answered,
+    total: row.total,
+    conforme: row.conforme,
+    answers: row.answers || {}
+  };
+}
+
+async function getHistory() {
+  try {
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("auditorias")
+        .select("id, area, area_name, dealer, audit_date, auditor, notes, score, answered, total, conforme, answers, created_at")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) {
+        console.error(error);
+        alert("Erro ao carregar histórico: " + (error.message || error));
+        return [];
+      }
+      return (data || []).map(mapAuditRow);
+    }
+    // REST fallback
+    var q = "/rest/v1/auditorias?select=id,area,area_name,dealer,audit_date,auditor,notes,score,answered,total,conforme,answers,created_at&order=created_at.desc&limit=200";
+    var data = await restQuery(q);
+    return (data || []).map(mapAuditRow);
+  } catch (e) {
+    console.error(e);
+    alert("Erro ao carregar histórico: " + (e.message || e));
+    return [];
+  }
+}
+
+function validateJustifications() {
+  if (!currentArea) return true;
+  const missing = [];
+  A[currentArea].q.forEach(q => {
+    const a = ans[currentArea + "_" + q.i];
+    if (a && a.s === "nok" && !(a.just && a.just.trim())) missing.push(q.i);
+  });
+  if (missing.length) {
+    alert("Preencha a justificativa de todos os itens Não Conforme.\nPendentes: " + missing.join(", "));
+    return false;
+  }
+  return true;
+}
+
+async function saveToHistory() {
+  if (!currentArea) return;
+  if (!isMaster()) { alert("Somente o perfil Qualidade pode salvar relatórios."); return; }
+  if (readOnly) { alert("Modo somente leitura."); return; }
+  if (!validateJustifications()) return;
+  const s = calc(currentArea);
+  if (s.an === 0) { alert("Responda pelo menos um item antes de salvar."); return; }
+
+  const payload = {
+    area: currentArea,
+    area_name: A[currentArea].n,
+    auditor: document.getElementById("auditorName").value.trim(),
+    dealer: document.getElementById("dealerName").value.trim() || null,
+    audit_date: document.getElementById("auditDate").value || null,
+    notes: document.getElementById("generalNotes").value.trim() || null,
+    score: s.p,
+    answered: s.an,
+    total: s.t,
+    conforme: s.ok,
+    answers: JSON.parse(JSON.stringify(
+      Object.fromEntries(Object.entries(ans).filter(([k]) => k.startsWith(currentArea + "_")))
+    )),
+    created_by: currentUser && currentUser.id ? currentUser.id : null,
+    updated_at: new Date().toISOString()
+  };
+
+  try {
+    if (supabase) {
+      if (editingHistoryId) {
+        const { error } = await supabase.from("auditorias").update(payload).eq("id", editingHistoryId);
+        if (error) throw error;
+        await clearDraft(); alert("Relatório atualizado!");
+      } else {
+        const { data, error } = await supabase.from("auditorias").insert(payload).select("id").single();
+        if (error) throw error;
+        editingHistoryId = data.id;
+        await clearDraft(); alert("Relatório salvo no histórico!");
+      }
+    } else {
+      if (editingHistoryId) {
+        await restQuery("/rest/v1/auditorias?id=eq." + encodeURIComponent(editingHistoryId), {
+          method: "PATCH",
+          body: payload
+        });
+        await clearDraft(); alert("Relatório atualizado!");
+      } else {
+        var rows = await restQuery("/rest/v1/auditorias", {
+          method: "POST",
+          body: payload,
+          prefer: "return=representation"
+        });
+        if (rows && rows[0] && rows[0].id) editingHistoryId = rows[0].id;
+        await clearDraft(); alert("Relatório salvo no histórico!");
+      }
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Erro ao salvar: " + (e.message || e));
+  }
+}
+
+
+function monthKeyFromDate(d) {
+  if (!d) return "";
+  const s = String(d).trim();
+  // YYYY-MM-DD
+  let m = s.match(/^(\d{4})-(\d{2})/);
+  if (m) return m[1] + "-" + m[2];
+  // DD/MM/YYYY
+  m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m) return m[3] + "-" + m[2];
+  return "";
+}
+function monthLabel(key) {
+  if (!key) return "Todos os meses";
+  const [y, m] = key.split("-");
+  const names = ["","Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  const mi = parseInt(m, 10);
+  return (names[mi] || m) + " / " + y;
+}
+function populateHistFilters(list) {
+  const months = new Set();
+  const dealers = new Set();
+  list.forEach(h => {
+    const mk = monthKeyFromDate(h.date);
+    if (mk) months.add(mk);
+    if (h.dealer) dealers.add(h.dealer);
+  });
+  const monthSel = document.getElementById("histMonthFilter");
+  if (monthSel) {
+    const cur = monthSel.value;
+    const sorted = [...months].sort().reverse();
+    monthSel.innerHTML = '<option value="">Todos os meses</option>' +
+      sorted.map(k => `<option value="${k}">${monthLabel(k)}</option>`).join("");
+    if (cur && sorted.includes(cur)) monthSel.value = cur;
+    else if (!cur && sorted.length) {
+      // default: mês atual se existir, senão o mais recente
+      const now = new Date();
+      const curKey = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,"0");
+      monthSel.value = sorted.includes(curKey) ? curKey : sorted[0];
+    }
+  }
+  const dealerSel = document.getElementById("histDealerFilter");
+  if (dealerSel) {
+    const cur = dealerSel.value;
+    const sorted = [...dealers].sort();
+    dealerSel.innerHTML = '<option value="">Todos</option>' +
+      sorted.map(d => `<option value="${d.replace(/"/g,"&quot;")}">${d}</option>`).join("");
+    if (cur && sorted.includes(cur)) dealerSel.value = cur;
+  }
+  // area filter already filled elsewhere - ensure options
+  const areaSel = document.getElementById("histAreaFilter");
+  if (areaSel && areaSel.options.length <= 1) {
+    areaSel.innerHTML = '<option value="">Todas as áreas</option>' +
+      Object.keys(A).map(k => `<option value="${k}">${A[k].n}</option>`).join("");
+  }
+}
+
+async function renderHistory() {
+  const el = document.getElementById("histList");
+  if (el) el.innerHTML = '<div class="empty">Carregando...</div>';
+
+  let list = await getHistory();
+  populateHistFilters(list);
+  // Viewer: RLS já filtra; reforço no cliente
+  if (currentUser && currentUser.role === "viewer") {
+    list = list.filter(h => h.area === currentUser.area);
+  }
+  const fArea = document.getElementById("histAreaFilter");
+  if (fArea && fArea.value) list = list.filter(h => h.area === fArea.value);
+  const fMonth = document.getElementById("histMonthFilter");
+  if (fMonth && fMonth.value) list = list.filter(h => monthKeyFromDate(h.date) === fMonth.value);
+  const fDealer = document.getElementById("histDealerFilter");
+  if (fDealer && fDealer.value) list = list.filter(h => h.dealer === fDealer.value);
+
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">Nenhum relatório salvo' +
+      (currentUser && currentUser.role === "viewer" ? " para a sua área" : "") +
+      '.</div>';
+    return;
+  }
+  el.innerHTML = list.map(h => {
+    const nc = (h.answered != null && h.conforme != null)
+      ? Math.max(0, (h.answered - h.conforme))
+      : null;
+    const canEdit = isMaster();
+    return `
+    <div class="hist-card">
+      <div class="info">
+        <strong>${h.areaName}</strong>
+        <span>${h.dealer || "—"} • ${h.date || "—"} • Auditor: ${h.auditor || "—"}</span>
+        ${nc != null ? `<div class="nc">${nc} não conforme${nc === 1 ? "" : "s"} · ${h.conforme || 0} conforme${(h.conforme||0)===1?"":"s"}</div>` : ""}
+      </div>
+      <div class="score">${h.score != null ? h.score + "%" : "—"}</div>
+      <div class="actions">
+        <button class="btn-view" onclick="loadFromHistory(${h.id})">${canEdit ? "Editar" : "Visualizar"}</button>
+        ${canEdit ? `<button class="btn-del" onclick="deleteHistory(${h.id})">Excluir</button>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function loadFromHistory(id) {
+  try {
+    var data = null;
+    if (supabase) {
+      const res = await supabase.from("auditorias").select("*").eq("id", id).single();
+      if (res.error || !res.data) {
+        alert("Relatório não encontrado.");
+        return;
+      }
+      data = res.data;
+    } else {
+      var rows = await restQuery("/rest/v1/auditorias?id=eq." + encodeURIComponent(id) + "&select=*");
+      if (!rows || !rows.length) {
+        alert("Relatório não encontrado.");
+        return;
+      }
+      data = rows[0];
+    }
+    const h = mapAuditRow(data);
+    if (!canAccessArea(h.area)) {
+      alert("Você não tem permissão para acessar relatórios desta área.");
+      return;
+    }
+    document.getElementById("auditorName").value = h.auditor || "Luan Mota";
+    document.getElementById("dealerName").value = h.dealer || "";
+    document.getElementById("auditDate").value = h.date || "";
+    document.getElementById("generalNotes").value = h.notes || "";
+    Object.keys(ans).forEach(k => { if (k.startsWith(h.area + "_")) delete ans[k]; });
+    if (h.answers) Object.assign(ans, h.answers);
+    currentArea = h.area;
+
+    readOnly = !isMaster();
+    document.body.classList.toggle("readonly-mode", readOnly);
+
+    ["auditorName","dealerName","auditDate","generalNotes"].forEach(fid => {
+      const el = document.getElementById(fid);
+      if (el) el.disabled = readOnly;
+    });
+
+    if (readOnly) {
+      editingHistoryId = null;
+      document.getElementById("areaTitle").textContent = h.areaName + " (somente leitura)";
+    } else {
+      editingHistoryId = h.id;
+      document.getElementById("areaTitle").textContent = h.areaName + " (editando)";
+    }
+    renderQuestions(h.area);
+    updateAreaScore();
+    const cont = document.getElementById("questionsContainer");
+    if (readOnly && cont) {
+      const ban = document.createElement("div");
+      ban.className = "readonly-banner";
+      ban.id = "readonlyBanner";
+      ban.textContent = "Modo visualização — você pode consultar e gerar o PDF, sem alterar respostas.";
+      cont.insertBefore(ban, cont.firstChild);
+    }
+    showView("checklist");
+  } catch (e) {
+    console.error(e);
+    alert("Erro ao abrir relatório.");
+  }
+}
+
+async function deleteHistory(id) {
+  if (!isMaster()) { alert("Somente o perfil Qualidade pode excluir relatórios."); return; }
+  if (!confirm("Excluir este relatório do histórico?")) return;
+  try {
+    if (supabase) {
+      const { error } = await supabase.from("auditorias").delete().eq("id", id);
+      if (error) throw error;
+    } else {
+      await restQuery("/rest/v1/auditorias?id=eq." + encodeURIComponent(id), { method: "DELETE" });
+    }
+    await renderHistory();
+  } catch (e) {
+    console.error(e);
+    alert("Erro ao excluir: " + (e.message || e));
+  }
+}
+
+function resetCurrent() {
+  if (!isMaster() || readOnly) { alert("Modo somente leitura."); return; }
+  if (!currentArea || !confirm("Limpar todas as respostas desta área?")) return;
+  Object.keys(ans).forEach(k => { if (k.startsWith(currentArea + "_")) delete ans[k]; });
+  editingHistoryId = null;
+  const ban = document.getElementById("draftBanner");
+  if (ban) ban.remove();
+  clearDraft();
+  document.getElementById("areaTitle").textContent = A[currentArea].n;
+  renderQuestions(currentArea);
+  updateAreaScore();
+}
+
+/* ===================== PDF ===================== */
+async function getLogoDataURL() {
+  return new Promise((resolve) => {
+    const img = document.querySelector("header img.logo");
+    if (img && img.complete && img.naturalWidth > 0) {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        resolve({ data: canvas.toDataURL("image/png"), w: img.naturalWidth, h: img.naturalHeight });
+        return;
+      } catch(e){}
+    }
+    const temp = new Image();
+    temp.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = temp.naturalWidth;
+        canvas.height = temp.naturalHeight;
+        canvas.getContext("2d").drawImage(temp, 0, 0);
+        resolve({ data: canvas.toDataURL("image/png"), w: temp.naturalWidth, h: temp.naturalHeight });
+      } catch(e){ resolve(null); }
+    };
+    temp.onerror = () => resolve(null);
+    temp.src = "Logotipo_Carmak__Branco_.png";
+  });
+}
+
+function addFooter(doc, pageNum, totalPages) {
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  doc.setDrawColor(200, 162, 77);
+  doc.setLineWidth(0.4);
+  doc.line(14, ph - 12, pw - 14, ph - 12);
+  doc.setFontSize(7);
+  doc.setTextColor(120, 120, 130);
+  doc.setFont("helvetica", "normal");
+  doc.text("Carmak • Documento controlado • Uso interno", 14, ph - 7);
+  doc.text(`Página ${pageNum} de ${totalPages}`, pw - 14, ph - 7, { align: "right" });
+}
+
+async function generatePDF() {
+  if (!currentArea) return;
+  if (!canAccessArea(currentArea)) { alert("Sem permissão para esta área."); return; }
+  if (!readOnly && !validateJustifications()) return;
+
+  const auditor = document.getElementById("auditorName").value.trim() || "Não informado";
+  const dealer = document.getElementById("dealerName").value.trim() || "Não informado";
+  const date = document.getElementById("auditDate").value || new Date().toISOString().slice(0,10);
+  const notes = document.getElementById("generalNotes").value.trim();
+  const s = calc(currentArea);
+  const nokCount = s.an - s.ok;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pw = doc.internal.pageSize.getWidth();
+  const m = 14;
+  let y = 0;
+
+  // Verde escuro #06402b = RGB(6, 64, 43)
+
+  // ===== CABEÇALHO =====
+  doc.setFillColor(6, 64, 43);
+  doc.rect(0, 0, pw, 26, "F");
+  doc.setFillColor(200, 162, 77);
+  doc.rect(0, 26, pw, 1.6, "F");
+
+  const logoInfo = await getLogoDataURL();
+  let textX = m;
+
+  if (logoInfo && logoInfo.data) {
+    try {
+      const maxLogoW = 34;
+      const maxLogoH = 12;
+      const ratio = logoInfo.w / logoInfo.h;
+      let logoW = maxLogoW;
+      let logoH = logoW / ratio;
+      if (logoH > maxLogoH) {
+        logoH = maxLogoH;
+        logoW = logoH * ratio;
+      }
+      const logoY = (26 - logoH) / 2;
+      doc.addImage(logoInfo.data, "PNG", m, logoY, logoW, logoH);
+      textX = m + logoW + 6;
+    } catch(e){}
+  }
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Relatório de Auditoria ASEC", textX, 11);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(243, 228, 187);
+  doc.text("Carmak • Toyota Material Handling  |  " + A[currentArea].n, textX, 17.5);
+
+  y = 34;
+
+  // ===== BLOCO DE IDENTIFICAÇÃO =====
+  doc.setFillColor(248, 249, 252);
+  doc.setDrawColor(220, 224, 232);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(m, y, pw - m * 2, 22, 1.5, 1.5, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(100, 110, 125);
+  doc.text("DEALER / FILIAL", m + 4, y + 6);
+  doc.text("DATA", m + 78, y + 6);
+  doc.text("AUDITOR", m + 115, y + 6);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.5);
+  doc.setTextColor(6, 64, 43);
+  doc.text(dealer, m + 4, y + 11.5);
+  doc.text(date, m + 78, y + 11.5);
+  doc.text(auditor, m + 115, y + 11.5);
+
+  doc.setFontSize(7);
+  doc.setTextColor(100, 110, 125);
+  doc.setFont("helvetica", "normal");
+  doc.text("ASSERTIVIDADE", m + 4, y + 18);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  const scoreColor = s.p >= 80 ? [31, 122, 92] : s.p >= 50 ? [163, 129, 47] : [164, 52, 74];
+  doc.setTextColor(...scoreColor);
+  doc.text((s.p === null ? "—" : s.p + "%"), m + 32, y + 18);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 110, 125);
+  doc.text(`${s.ok} conformes  •  ${nokCount} não conformes  •  ${s.an}/${s.t} respondidos`, m + 50, y + 18);
+
+  y += 28;
+
+  if (notes) {
+    doc.setFontSize(8);
+    doc.setTextColor(80, 90, 105);
+    doc.text("Observações: " + notes, m, y);
+    y += 6;
+  }
+
+  // ===== TABELA =====
+  const body = [];
+  A[currentArea].q.forEach(q => {
+    const a = ans[currentArea + "_" + q.i] || {};
+    let st = "Não respondido";
+    if (a.s === "ok") st = "Conforme";
+    if (a.s === "nok") st = "Não Conforme";
+
+    let flags = [];
+    if (q.m) flags.push("MANDATÓRIO");
+    if (q.e) flags.push("EVIDENCIÁVEL");
+
+    const nImgs = (a.imgs && a.imgs.length) || 0;
+    let itemText = q.t;
+    if (a.s === "nok" && a.just) itemText += "\n\nMotivo: " + a.just;
+
+    body.push([
+      q.i,
+      itemText,
+      flags.join("\n"),
+      st,
+      nImgs ? nImgs + (nImgs > 1 ? " fotos" : " foto") : "—"
+    ]);
+  });
+
+  doc.autoTable({
+    startY: y,
+    head: [["Código", "Item Avaliado", "Classificação", "Status", "Evid."]],
+    body,
+    theme: "plain",
+    headStyles: {
+      fillColor: [6, 64, 43],
+      textColor: [243, 228, 187],
+      fontSize: 7.5,
+      fontStyle: "bold",
+      cellPadding: { top: 2.8, bottom: 2.8, left: 2.5, right: 2.5 }
+    },
+    styles: {
+      fontSize: 7.2,
+      cellPadding: { top: 2.4, bottom: 2.4, left: 2.5, right: 2.5 },
+      overflow: "linebreak",
+      lineColor: [220, 224, 232],
+      lineWidth: 0.25,
+      textColor: [30, 40, 55]
+    },
+    columnStyles: {
+      0: { cellWidth: 15, fontStyle: "bold", textColor: [6, 64, 43] },
+      1: { cellWidth: 98 },
+      2: { cellWidth: 28, fontSize: 6.2, textColor: [140, 110, 40] },
+      3: { cellWidth: 24, fontStyle: "bold", halign: "center" },
+      4: { cellWidth: 15, halign: "center", fontSize: 7 }
+    },
+    margin: { left: m, right: m },
+    didParseCell(data) {
+      if (data.section === "body") {
+        if (data.row.index % 2 === 0) data.cell.styles.fillColor = [250, 251, 253];
+        if (data.column.index === 3) {
+          if (data.cell.raw === "Conforme") {
+            data.cell.styles.textColor = [25, 120, 75];
+            data.cell.styles.fillColor = [225, 245, 232];
+          } else if (data.cell.raw === "Não Conforme") {
+            data.cell.styles.textColor = [170, 40, 55];
+            data.cell.styles.fillColor = [255, 232, 235];
+          } else {
+            data.cell.styles.textColor = [140, 140, 150];
+          }
+        }
+      }
+    }
+  });
+
+  y = doc.lastAutoTable.finalY + 12;
+
+  // ===== ASSINATURA =====
+  if (y > 230) { doc.addPage(); y = 20; }
+
+  doc.setDrawColor(200, 162, 77);
+  doc.setLineWidth(0.5);
+  doc.line(m, y, pw - m, y);
+  y += 8;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(6, 64, 43);
+  doc.text("Validação do Auditor", m, y);
+  y += 10;
+
+  doc.setDrawColor(200, 205, 215);
+  doc.setLineWidth(0.3);
+  doc.setFillColor(252, 252, 254);
+  doc.roundedRect(m, y, 85, 28, 1.5, 1.5, "FD");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(80, 90, 105);
+  doc.text("Auditor responsável", m + 4, y + 6);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(6, 64, 43);
+  doc.text(auditor, m + 4, y + 12);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(100, 110, 125);
+  doc.text("Analista de Qualidade", m + 4, y + 17.5);
+  doc.text("Data: " + date, m + 4, y + 23);
+
+  doc.setDrawColor(150, 155, 165);
+  doc.setLineWidth(0.4);
+  doc.line(m + 100, y + 20, m + 170, y + 20);
+  doc.setFontSize(7.5);
+  doc.setTextColor(140, 145, 155);
+  doc.text("Assinatura", m + 128, y + 25);
+
+  // ===== EVIDÊNCIAS (recomprimidas para PDF leve) =====
+  const evs = [];
+  let totalPhotoBytes = 0;
+  for (const q of A[currentArea].q) {
+    const a = ans[currentArea + "_" + q.i];
+    if (a && a.imgs && a.imgs.length) {
+      const imgs = await prepareImagesForPdf(a.imgs);
+      imgs.forEach(im => { totalPhotoBytes += (im.data ? im.data.length : 0); });
+      if (imgs.length) evs.push({ i: q.i, t: q.t, s: a.s, just: a.just, imgs });
+    }
+  }
+
+  // ~base64 overhead: tamanho aproximado do payload de fotos no PDF
+  const approxMb = (totalPhotoBytes * 0.75) / (1024 * 1024);
+  if (approxMb > 8) {
+    const ok = confirm(
+      "Atenção: as evidências somam cerca de " + approxMb.toFixed(1) + " MB.\n" +
+      "Arquivos grandes podem falhar no WhatsApp, e-mail ou Teams.\n\n" +
+      "Deseja gerar mesmo assim?\n(Recomendado: menos fotos ou remova as menos importantes.)"
+    );
+    if (!ok) return;
+  }
+
+  if (evs.length) {
+    doc.addPage();
+    doc.setFillColor(6, 64, 43);
+    doc.rect(0, 0, pw, 16, "F");
+    doc.setFillColor(200, 162, 77);
+    doc.rect(0, 16, pw, 1.4, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("Evidências Fotográficas", m, 10.5);
+
+    y = 24;
+    const imgW = 58, imgH = 42, gap = 5;
+
+    for (const it of evs) {
+      if (y > 245) {
+        doc.addPage();
+        doc.setFillColor(6, 64, 43);
+        doc.rect(0, 0, pw, 12, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(9);
+        doc.text("Evidências Fotográficas (continuação)", m, 8);
+        y = 20;
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(6, 64, 43);
+      doc.text(it.i, m, y);
+
+      const stTxt = it.s === "ok" ? "Conforme" : it.s === "nok" ? "Não Conforme" : "—";
+      doc.setTextColor(it.s === "ok" ? 25 : 170, it.s === "ok" ? 120 : 40, it.s === "ok" ? 75 : 55);
+      doc.text("• " + stTxt, m + 18, y);
+      y += 5;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(55, 65, 80);
+      const ls = doc.splitTextToSize(it.t, pw - m * 2);
+      doc.text(ls, m, y);
+      y += ls.length * 3.4 + 1.5;
+
+      if (it.just) {
+        doc.setTextColor(164, 52, 74);
+        doc.setFont("helvetica", "bold");
+        const jl = doc.splitTextToSize("Motivo: " + it.just, pw - m * 2);
+        doc.text(jl, m, y);
+        y += jl.length * 3.4 + 2;
+        doc.setFont("helvetica", "normal");
+      }
+
+      let xOff = m, rowMaxH = 0;
+      for (const im of it.imgs) {
+        if (xOff + imgW > pw - m) {
+          xOff = m;
+          y += rowMaxH + gap;
+          rowMaxH = 0;
+        }
+        if (y + imgH > 270) {
+          doc.addPage();
+          y = 18;
+          xOff = m;
+          rowMaxH = 0;
+        }
+        try {
+          const ip = doc.getImageProperties(im.data);
+          const r = Math.min(imgW / ip.width, imgH / ip.height);
+          const w = ip.width * r, h = ip.height * r;
+          doc.addImage(im.data, "JPEG", xOff, y, w, h);
+          doc.setDrawColor(200, 162, 77);
+          doc.setLineWidth(0.35);
+          doc.rect(xOff, y, w, h);
+          rowMaxH = Math.max(rowMaxH, h);
+        } catch(e) {}
+        xOff += imgW + gap;
+      }
+      y += rowMaxH + 9;
+    }
+  }
+
+  // Rodapé em todas as páginas
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    addFooter(doc, i, totalPages);
+  }
+
+  const safe = (s) => String(s || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "")
+    .slice(0, 40) || "x";
+  const fname = "Relatorio_ASEC_" + safe(A[currentArea].n) + "_" + safe(dealer) + "_" + safe(date) + ".pdf";
+  doc.save(fname);
+}
+
+// Inicialização
+initAreaCards();
+
+["auditorName","dealerName","auditDate","generalNotes"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("change", () => scheduleDraftSave(1000));
+  if (el) el.addEventListener("input", () => scheduleDraftSave(1500));
+});
+
+
+// Enter key no login
+document.getElementById("loginPass").addEventListener("keydown", function(e){
+  if (e.key === "Enter") doLogin();
+});
+document.getElementById("loginUser").addEventListener("keydown", function(e){
+  if (e.key === "Enter") document.getElementById("loginPass").focus();
+});
+
+// Sessão Supabase: restaura login se ainda válido
+(async function boot(){
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session && session.user) {
+      const profile = await loadProfile(session.user.id);
+      if (profile) {
+        currentUser = profile;
+        enterApp();
+        setTimeout(function(){ offerRestoreDraftOnEnter(); }, 400);
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn("Sessão não restaurada", e);
+  }
+  document.getElementById("login-screen").classList.remove("hidden");
+  document.getElementById("app-root").classList.add("hidden");
+})();
+</script>
+</body>
+</html>
