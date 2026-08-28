@@ -1241,13 +1241,24 @@ function isViewer(){
 function canEdit(){
   return !isViewer();
 }
+function displayUserLabel(){
+  if(isViewer()) return 'Visualização';
+  const named = (sessionStorage.getItem('sgq_name')||'').trim();
+  if(named) return named;
+  const em = (sessionStorage.getItem('sgq_email')||'').toLowerCase();
+  if(em.indexOf('qualidade')>=0) return 'Qualidade Carmak';
+  if(em.indexOf('gp@')===0 || em.indexOf('gp.')>=0) return 'Gente & Performance';
+  const local = (sessionStorage.getItem('sgq_email')||'').split('@')[0]||'Qualidade';
+  // "qualidadecarmak" → "Qualidade Carmak"
+  return local.replace(/([a-z])([A-Z])/g,'$1 $2')
+    .replace(/carmak/ig,' Carmak')
+    .replace(/^./, function(c){ return c.toUpperCase(); })
+    .replace(/\s+/g,' ').trim() || 'Qualidade Carmak';
+}
 function applyRoleUI(){
   document.body.classList.toggle('viewer-mode', isViewer());
   const chip=document.getElementById('userChip');
-  if(chip){
-    const em=sessionStorage.getItem('sgq_email')||'';
-    chip.textContent = isViewer() ? 'Visualização' : (em.split('@')[0]||'Qualidade');
-  }
+  if(chip) chip.textContent = displayUserLabel();
 }
 
 async function loadSgqProfile(userId, email){
@@ -1260,6 +1271,10 @@ async function loadSgqProfile(userId, email){
       rows = await sbRest('GET','profiles',{query:'email=eq.'+encodeURIComponent(email)+'&select=id,email,role,full_name,area'});
     }
     const p = rows && rows[0];
+    if(p){
+      if(p.full_name) sessionStorage.setItem('sgq_name', String(p.full_name).trim());
+      else if(p.email && /qualidade/i.test(p.email)) sessionStorage.setItem('sgq_name', 'Qualidade Carmak');
+    }
     if(p && p.role){
       const role = String(p.role).toLowerCase();
       if(role==='viewer' || role==='visualizador') return 'viewer';
@@ -1927,7 +1942,7 @@ async function gerarRelatorioTreinoPdf(){
 
   let y=36;
   y=pdfSection(doc,y,"Indicadores de capacitação (como no dashboard)",colors);
-  y=pdfCaption(doc,y,"O que mede: progresso nos STEPs 1–3 e aptos aguardando turma. Como mede: STEP completo = 3 módulos do bloco concluídos; % médio = média das % individuais (módulos concluídos ÷ total de módulos).",colors);
+  y=pdfCaption(doc,y,"O que mede: progresso nos STEPs 1–3 e aptos aguardando turma. Como mede: STEP completo = 3 módulos do bloco concluídos; % médio = média das % individuais.",colors);
   y=pdfCards(doc,y,[
     {l:"Técnicos",v:people.length,s:"cadastrados"},
     {l:"STEP 1",v:s1,s:Math.round(100*s1/n)+"% completo"},
@@ -1939,7 +1954,7 @@ async function gerarRelatorioTreinoPdf(){
   y=pdfNote(doc,y,media>=80?"Média de conclusão em patamar saudável.":"Média abaixo de 80%. Priorizar módulos e regiões com menor aderência.",colors);
 
   y=pdfSection(doc,y,"Progresso por módulo (barras empilhadas)",colors);
-  y=pdfCaption(doc,y,"O que mede: em cada módulo, quantos técnicos estão Concluído / Apto / Inscrito / sem status. Como mede: leitura do status do módulo no cadastro de cada técnico. Número à direita = só concluídos.",colors);
+  y=pdfCaption(doc,y,"O que mede: em cada módulo, quantos técnicos estão Concluído / Apto / Inscrito / sem status. Número à direita = concluídos.",colors);
   const mods=(typeof MODULES_T!=="undefined"&&MODULES_T.length)?MODULES_T:[];
   const rows=mods.map(m=>{
     let conc=0,apto=0,insc=0,none=0;
@@ -1957,45 +1972,151 @@ async function gerarRelatorioTreinoPdf(){
   y=pdfNote(doc,y,"Trecho cinza (sem status) e azul (inscrito) mostram a fila; dourado indica conclusão efetiva.",colors);
 
   y=pdfSection(doc,y,"Faixas de conclusão individual",colors);
-  y=pdfCaption(doc,y,"O que mede: quantos técnicos estão em cada faixa de % de conclusão da trilha. Como mede: % do técnico = módulos concluídos ÷ total de módulos da trilha.",colors);
+  y=pdfCaption(doc,y,"O que mede: quantos técnicos em cada faixa de % de conclusão da trilha.",colors);
   const buckets={"0–25%":0,"26–50%":0,"51–75%":0,"76–100%":0};
   people.forEach(p=>{const pc=typeof personPct==="function"?personPct(p):0;if(pc<=25)buckets["0–25%"]++;else if(pc<=50)buckets["26–50%"]++;else if(pc<=75)buckets["51–75%"]++;else buckets["76–100%"]++;});
   y=pdfHBars(doc,y,Object.keys(buckets).map(k=>({l:k,v:buckets[k],alert:k==="0–25%"})),colors);
   y=pdfNote(doc,y,"Visão diretoria por faixas — sem nomes de colaboradores.",colors);
 
-  y=pdfSection(doc,y,"Mapa por UF",colors);
-  y=pdfCaption(doc,y,"O que mede: % médio de conclusão dos técnicos de cada UF. Como mede: média das % individuais dos técnicos com aquele estado (rótulo mostra UF e quantidade).",colors);
-  const byUf={};people.forEach(p=>{let uf=p.estado||"";if(!uf&&p.regiao){const m=String(p.regiao).match(/\b([A-Z]{2})\s*$/);uf=m?m[1]:"N/D";}uf=(uf||"N/D").toUpperCase();if(!byUf[uf])byUf[uf]={tec:0,sum:0};byUf[uf].tec++;byUf[uf].sum+=(typeof personPct==="function"?personPct(p):0);});
+  y=pdfSection(doc,y,"Mapa por UF (% médio de conclusão)",colors);
+  y=pdfCaption(doc,y,"O que mede: % médio de conclusão por UF. Rótulo = UF (qtd. técnicos).",colors);
+  const byUf={};people.forEach(p=>{let uf=p.estado||"";if(!uf&&p.regiao){const m=String(p.regiao).match(/\\b([A-Z]{2})\\s*$/);uf=m?m[1]:"N/D";}uf=(uf||"N/D").toUpperCase();if(!byUf[uf])byUf[uf]={tec:0,sum:0};byUf[uf].tec++;byUf[uf].sum+=(typeof personPct==="function"?personPct(p):0);});
   y=pdfHBars(doc,y,Object.keys(byUf).sort().map(uf=>({l:uf+" ("+byUf[uf].tec+")",v:Math.round(byUf[uf].sum/byUf[uf].tec)})),colors,{labelW:40,barW:105});
-  y=pdfNote(doc,y,"UF com média baixa indica onde priorizar turmas e suporte de capacitação.",colors);
+
+  // Mapa do Brasil (módulos concluídos por UF) — igual dashboard
+  y=pdfSection(doc,y,"Mapa do Brasil — módulos concluídos por UF",colors);
+  y=pdfCaption(doc,y,"O que mede: quantidade de certificações/módulos concluídos por estado (mesma métrica do mapa do dashboard). Como mede: para cada técnico, conta status 'Concluído' por módulo e agrega pela UF.",colors);
+  y = await pdfBrazilMapFromDash(doc, y, colors);
+  y=pdfNote(doc,y,"Intensidade da cor = volume de módulos concluídos na UF. Estados sem técnicos ficam claros.",colors);
 
   pdfFooter(doc,colors);doc.save("Treinamentos_"+ref.ym+".pdf");
 }
+
+/** Captura o mapa do dashboard ou desenha grade de UFs com módulos concluídos */
+async function pdfBrazilMapFromDash(doc, y, colors){
+  const navy=hexToRgb(colors.navy), gold=hexToRgb(colors.gold);
+  const by = (typeof calcByEstado==="function") ? calcByEstado() : {};
+  // tenta capturar SVG do mapa já renderizado
+  try{
+    let wrap=document.getElementById("map-svg-wrap");
+    let svg=wrap && wrap.querySelector("svg");
+    if(!svg && typeof renderTrainMap==="function"){
+      // cria container offscreen
+      let host=document.getElementById("pdf-map-host");
+      if(!host){
+        host=document.createElement("div");
+        host.id="pdf-map-host";
+        host.style.cssText="position:fixed;left:-9999px;top:0;width:560px;height:520px;";
+        host.innerHTML='<div id="map-svg-wrap"></div><div id="map-tooltip" style="display:none"></div>';
+        document.body.appendChild(host);
+      }
+      renderTrainMap();
+      wrap=document.getElementById("map-svg-wrap");
+      svg=wrap && wrap.querySelector("svg");
+      await new Promise(r=>setTimeout(r,80));
+      svg=wrap && wrap.querySelector("svg");
+    }
+    if(svg){
+      const xml=new XMLSerializer().serializeToString(svg);
+      const svg64="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(xml);
+      const img=await new Promise(function(resolve,reject){
+        const im=new Image();
+        im.onload=()=>resolve(im); im.onerror=reject; im.src=svg64;
+      });
+      const canvas=document.createElement("canvas");
+      canvas.width=560; canvas.height=520;
+      const ctx=canvas.getContext("2d");
+      ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,560,520);
+      ctx.drawImage(img,0,0,560,520);
+      const png=canvas.toDataURL("image/png");
+      const w=120, h=110;
+      if(y+h>280){ doc.addPage(); y=16; }
+      doc.addImage(png,"PNG",14,y,w,h);
+      // legenda ao lado
+      let ly=y+6;
+      const entries=Object.keys(by).filter(uf=>by[uf].cursos>0).sort((a,b)=>by[b].cursos-by[a].cursos);
+      doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(navy[0],navy[1],navy[2]);
+      doc.text("Módulos concluídos por UF", 140, ly); ly+=6;
+      doc.setFont("helvetica","normal"); doc.setFontSize(7);
+      entries.slice(0,14).forEach(uf=>{
+        doc.setTextColor(40,40,40);
+        doc.text(uf+": "+by[uf].cursos+" módulo(s) · "+by[uf].tecnicos+" téc.", 140, ly);
+        ly+=4.5;
+      });
+      return Math.max(y+h, ly)+4;
+    }
+  }catch(e){ console.warn("pdf map capture", e); }
+
+  // fallback: tabela-resumo
+  const entries=Object.keys(by).filter(uf=>by[uf].cursos>0).sort((a,b)=>by[b].cursos-by[a].cursos);
+  if(!entries.length){
+    doc.setFontSize(8); doc.setTextColor(100,100,100);
+    doc.text("Sem dados de UF para montar o mapa.",14,y); return y+8;
+  }
+  y=pdfHBars(doc,y,entries.map(uf=>({l:uf+" ("+by[uf].tecnicos+" téc.)", v:by[uf].cursos})),colors,{labelW:48,barW:100});
+  return y;
+}
+
 
 /* ---------- ASEC ---------- */
 async function gerarRelatorioAsecPdf(){
   const JS=pdfEnsureLibs();if(!JS)return;const colors=themePdfColors(),doc=new JS({orientation:"portrait",unit:"mm",format:"a4"}),ref=pdfMesRef();
   pdfHeader(doc,"Relatório mensal — ASEC (gerencial)",colors);
-  const asec=DB.asec||{},aud=asec.auditorias||[],assertv=asec.assertividade||[],dealer=asec.dealer||[];
+  const asec=DB.asec||{};
+  const aud=asec.auditorias||[];
+  const assertv=asec.assertividade||[];
+  const dealer=asec.dealer||[];
   let nc=(asec.nc_all||[]).slice();
-  if(!nc.length){(asec.nc_matriz||[]).forEach(x=>nc.push(Object.assign({},x,{unidade:x.unidade||"Matriz"})));(asec.nc_itajai||[]).forEach(x=>nc.push(Object.assign({},x,{unidade:x.unidade||"Itajaí"})));}
-  const mesNome=ref.mes,mo=ref.d.getMonth()+1;
-  function matchMes(m){const s=String(m||"");if(s===mesNome)return true;if(s.indexOf("-"+String(mo).padStart(2,"0"))>=0)return true;return false;}
-  let real=0,plan=0;aud.forEach(r=>{if(matchMes(r.mes)){real+=Number(r.realizadas)||0;plan+=Number(r.planejadas)||0;}});
-  if(!real&&!plan&&Array.isArray(aud)&&aud.length){
-    // fallback: somar linhas do mês atual se estrutura for lista de auditorias individuais
-    const live=(asec.live_auditorias||[]);
-    // use dashboard logic fields if present on first matching
+  if(!nc.length){
+    (asec.nc_matriz||[]).forEach(x=>nc.push(Object.assign({},x,{unidade:x.unidade||"Matriz"})));
+    (asec.nc_itajai||[]).forEach(x=>nc.push(Object.assign({},x,{unidade:x.unidade||"Itajaí"})));
   }
-  let ncMes=0,sugMes=0;nc.forEach(r=>{if(matchMes(r.mes)){ncMes+=Number(r.nc)||0;sugMes+=Number(r.sug!=null?r.sug:r.sugestoes)||0;}});
-  // If zero, try current month labels in Portuguese only
-  const assertMes=assertv.filter(x=>matchMes(x.mes));
-  let sumN=0,nN=0;assertMes.forEach(x=>{if(x.nota!=null){sumN+=Number(x.nota);nN++;}});
+  const MES_PT=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  function mesKey(m){
+    const s=String(m||"");
+    if(MES_PT.includes(s)) return s;
+    const mm=s.match(/^(\d{4})-(\d{2})/);
+    if(mm){ const mo=parseInt(mm[2],10); return MES_PT[mo-1]||s; }
+    const low=s.toLowerCase();
+    const hit=MES_PT.find(x=>x.toLowerCase()===low||x.toLowerCase().slice(0,3)===low.slice(0,3));
+    return hit||s;
+  }
+  const mesAtual=MES_PT[ref.d.getMonth()];
+  function isMes(m){ return mesKey(m)===mesAtual; }
+
+  // Auditorias: mesma lógica do dashboard (mês corrente)
+  let real=0,plan=0;
+  aud.forEach(r=>{
+    if(!isMes(r.mes)) return;
+    real+=Number(r.realizadas)||0;
+    plan+=Number(r.planejadas)||0;
+  });
+
+  let ncMes=0,sugMes=0;
+  nc.forEach(r=>{
+    if(!isMes(r.mes)) return;
+    ncMes+=Number(r.nc)||0;
+    sugMes+=Number(r.sug!=null?r.sug:r.sugestoes)||0;
+  });
+
+  // Assertividade: todos os setores do mês (qualquer unidade)
+  let assertMes=assertv.filter(x=>isMes(x.mes));
+  // se vazio, usa o mês mais recente que tiver dados
+  let mesAssertLabel=mesAtual;
+  if(!assertMes.length && assertv.length){
+    const keys=[...new Set(assertv.map(x=>mesKey(x.mes)))];
+    const ord=keys.slice().sort((a,b)=>MES_PT.indexOf(b)-MES_PT.indexOf(a));
+    const pick=ord.find(k=>MES_PT.indexOf(k)>=0)||ord[0];
+    assertMes=assertv.filter(x=>mesKey(x.mes)===pick);
+    mesAssertLabel=pick;
+  }
+  let sumN=0,nN=0;
+  assertMes.forEach(x=>{ if(x.nota!=null){ sumN+=Number(x.nota); nN++; } });
   const mediaA=nN?(sumN/nN):null;
 
   let y=36;
-  y=pdfSection(doc,y,"Indicadores do mês ("+mesNome+")",colors);
-  y=pdfCaption(doc,y,"O que mede: execução do plano de auditoria e volume de NC/sugestões no mês. Como mede: realizadas/planejadas da base mensal; NC e sugestões somadas por unidade no mês de referência.",colors);
+  y=pdfSection(doc,y,"Indicadores do mês ("+mesAtual+")",colors);
+  y=pdfCaption(doc,y,"O que mede: execução do plano de auditoria e volume de NC/sugestões. Como mede: realizadas/planejadas no mês; NC e sugestões somadas por unidade no mês (mesKey normaliza 'Agosto' e '2026-08').",colors);
   y=pdfCards(doc,y,[
     {l:"Realizadas",v:real,s:"auditorias"},
     {l:"Planejadas",v:plan,s:"cronograma"},
@@ -2003,41 +2124,66 @@ async function gerarRelatorioAsecPdf(){
     {l:"Sugestões",v:sugMes,s:"melhorias"}
   ],colors);
   const ad=plan?Math.round(100*real/plan):null;
-  y=pdfNote(doc,y,ad==null?"Sem base planejado/realizado para o mês na base sincronizada — confira se o dashboard ASEC foi atualizado (↻).":"Aderência ao plano: "+ad+"%. "+(ad>=90?"Execução alinhada.":"Gap em relação ao planejado — revisar capacidade e agenda."),colors);
+  y=pdfNote(doc,y,ad==null?"Sem planejado/realizado para o mês — atualize a base no dashboard ASEC (↻).":"Aderência ao plano: "+ad+"%. "+(ad>=90?"Execução alinhada.":"Gap em relação ao planejado — revisar capacidade e agenda."),colors);
+
   if(mediaA!=null){
-    const pct=mediaA<=1?Math.round(mediaA*100):Math.round(mediaA);
-    y=pdfCards(doc,y,[{l:"Assertividade média",v:pct+"%",s:"média dos setores no mês"}],colors);
-    y=pdfCaption(doc,y,"Assertividade média = média das notas dos setores no mês (nota 0–1 convertida em %).",colors);
+    const pct=mediaA<=1?Math.round(mediaA*1000)/10:Math.round(mediaA*10)/10;
+    y=pdfCards(doc,y,[{l:"Assertividade média",v:pct+"%",s:"setores · "+mesAssertLabel}],colors);
   }
 
-  y=pdfSection(doc,y,"Assertividade por setor (mês)",colors);
-  y=pdfCaption(doc,y,"O que mede: nota de assertividade de cada setor no mês. Como mede: registro em asec_assertividade (nota por unidade/setor/mês), exibida em %.",colors);
-  const bySet={};assertMes.forEach(x=>{const s=x.setor||"—";if(!bySet[s])bySet[s]=[];bySet[s].push(Number(x.nota)||0);});
-  const setorBars=Object.keys(bySet).sort().map(s=>{const a=bySet[s],avg=a.reduce((p,c)=>p+c,0)/a.length;return{l:s,v:avg<=1?Math.round(avg*100):Math.round(avg)};});
-  if(setorBars.length)y=pdfHBars(doc,y,setorBars,colors,{labelW:48,barW:100});
-  else{doc.setFontSize(8);doc.setTextColor(100,100,100);doc.text("Sem dados de assertividade para este mês na base sincronizada.",14,y);y+=8;}
-  y=pdfNote(doc,y,"Setores < 80% sugerem plano de ação e reauditoria pontual.",colors);
+  y=pdfSection(doc,y,"Assertividade por setor ("+mesAssertLabel+")",colors);
+  y=pdfCaption(doc,y,"O que mede: nota de assertividade de cada setor no período. Como mede: registros salvos em asec_assertividade (relatórios ASEC); se houver mais de uma unidade/setor, usa a média.",colors);
+  const bySet={};
+  assertMes.forEach(x=>{
+    const s=String(x.setor||"—").trim();
+    if(!bySet[s]) bySet[s]=[];
+    bySet[s].push(Number(x.nota)||0);
+  });
+  const setorBars=Object.keys(bySet).sort(function(a,b){return a.localeCompare(b,"pt-BR");}).map(s=>{
+    const a=bySet[s], avg=a.reduce((p,c)=>p+c,0)/a.length;
+    const pct=avg<=1?Math.round(avg*1000)/10:Math.round(avg*10)/10;
+    return {l:s, v:pct};
+  });
+  if(setorBars.length) y=pdfHBars(doc,y,setorBars,colors,{labelW:52,barW:100});
+  else { doc.setFontSize(8); doc.setTextColor(100,100,100); doc.text("Sem dados de assertividade na base. Gere e salve relatórios ASEC ou sincronize.",14,y); y+=8; }
+  y=pdfNote(doc,y,"Todos os setores com registro no período aparecem aqui. Setores < 80% sugerem plano de ação.",colors);
 
-  y=pdfSection(doc,y,"NC × Sugestões por unidade (mês)",colors);
-  y=pdfCaption(doc,y,"O que mede: quantidade de não conformidades e sugestões por unidade no mês. Como mede: soma dos campos NC e Sugestões nas linhas do mês.",colors);
-  const ncU={};nc.forEach(r=>{if(!matchMes(r.mes))return;const u=r.unidade||"—";if(!ncU[u])ncU[u]={nc:0,sug:0};ncU[u].nc+=Number(r.nc)||0;ncU[u].sug+=Number(r.sug!=null?r.sug:r.sugestoes)||0;});
-  const bars=[];Object.keys(ncU).forEach(u=>{bars.push({l:u+" · NC",v:ncU[u].nc,alert:true});bars.push({l:u+" · Sugestões",v:ncU[u].sug});});
-  if(bars.length)y=pdfHBars(doc,y,bars,colors,{labelW:55,barW:95});
-  else{doc.setFontSize(8);doc.setTextColor(100,100,100);doc.text("Sem NC/sugestões lançadas para o mês de referência.",14,y);y+=8;}
+  y=pdfSection(doc,y,"NC × Sugestões por unidade ("+mesAtual+")",colors);
+  y=pdfCaption(doc,y,"O que mede: NC e sugestões de melhoria por unidade no mês. Como mede: tabela asec_nc_mes (campos nc e sugestoes), filtrada pelo mês.",colors);
+  const ncU={};
+  nc.forEach(r=>{
+    if(!isMes(r.mes)) return;
+    const u=r.unidade||"—";
+    if(!ncU[u]) ncU[u]={nc:0,sug:0};
+    ncU[u].nc+=Number(r.nc)||0;
+    ncU[u].sug+=Number(r.sug!=null?r.sug:r.sugestoes)||0;
+  });
+  const bars=[];
+  Object.keys(ncU).sort().forEach(u=>{
+    bars.push({l:u+" · NC", v:ncU[u].nc, alert:true});
+    bars.push({l:u+" · Sugestões", v:ncU[u].sug});
+  });
+  if(bars.length) y=pdfHBars(doc,y,bars,colors,{labelW:55,barW:95});
+  else { doc.setFontSize(8); doc.setTextColor(100,100,100); doc.text("Sem NC/sugestões lançadas para "+mesAtual+" (cadastre no módulo NC × Sugestões).",14,y); y+=8; }
   y=pdfNote(doc,y,"Sugestões altas com NC baixa indicam cultura de melhoria; NC alta exige contenção e causa raiz.",colors);
 
-  y=pdfSection(doc,y,"Dealer Evaluation (mês)",colors);
-  y=pdfCaption(doc,y,"O que mede: nota geral do dealer no mês (escala %). Como mede: campo nota_geral da avaliação do mês (0–1 → %).",colors);
-  const dl=dealer.filter(d=>matchMes(d.mes));
+  y=pdfSection(doc,y,"Dealer Evaluation ("+mesAtual+")",colors);
+  y=pdfCaption(doc,y,"O que mede: nota geral do dealer no mês (%). Como mede: dealer_evaluation (nota_geral). Costuma ser preenchido no fechamento do mês.",colors);
+  const dl=dealer.filter(d=>isMes(d.mes));
   if(dl.length){
-    y=pdfHBars(doc,y,dl.map(d=>{const g=Number(d.geral);return{l:String(d.dealer||"—").replace("Carmak - ","").slice(0,24),v:g<=1?Math.round(g*1000)/10:g};}),colors,{labelW:55,barW:95});
+    y=pdfHBars(doc,y,dl.map(d=>{
+      const g=Number(d.geral);
+      return {l:String(d.dealer||"—").replace("Carmak - ","").slice(0,24), v:g<=1?Math.round(g*1000)/10:g};
+    }),colors,{labelW:55,barW:95});
   } else {
-    doc.setFontSize(8);doc.setTextColor(100,100,100);doc.text("Sem avaliações de dealer no mês de referência.",14,y);y+=8;
+    doc.setFontSize(8); doc.setTextColor(100,100,100);
+    doc.text("Sem avaliação de dealer em "+mesAtual+" — campo preenchido tipicamente no fechamento do mês.",14,y); y+=8;
   }
-  y=pdfNote(doc,y,"Comparar unidades ajuda a priorizar suporte e follow-up de auditoria.",colors);
+  y=pdfNote(doc,y,"Quando houver notas, o comparativo entre unidades prioriza suporte e follow-up.",colors);
 
   pdfFooter(doc,colors);doc.save("ASEC_"+ref.ym+".pdf");
 }
+
 
 /* ---------- METROLOGIA (KPIs + barras verticais como no dash) ---------- */
 async function gerarRelatorioMetroPdf(){
@@ -2248,7 +2394,6 @@ function renderSgqDash(){
   return `<div class="sgq-dash"><div class="page-h" style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px">
   <div>
     <h1>Dashboard SGQ</h1>
-    <p>${docs.length} documentos · ${fTot} fluxogramas · sincronizado com Supabase</p>
   </div>
   <button type="button" class="btn btn-g" id="btnRelSgqPdf" title="Gera PDF com resumo, vencidos, fluxogramas">📄 Relatório PDF</button>
 </div>
@@ -2750,7 +2895,7 @@ function renderTreinDash(){
 
   setTimeout(()=>{try{renderTrainMap()}catch(e){console.warn(e)}},50);
 
-  return `<div class="page-h" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:12px"><div><h1>Dashboard Treinamentos</h1><p>Progresso dos técnicos nos módulos STEP 1–3 (TO/BT) e status de aptidão para próximas turmas.</p></div><button type="button" class="btn btn-g" id="btnRelTreinoPdf">📄 Relatório PDF</button></div>
+  return `<div class="page-h" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:12px"><div><h1>Dashboard Treinamentos</h1></div><button type="button" class="btn btn-g" id="btnRelTreinoPdf">📄 Relatório PDF</button></div>
 
   <div class="kpi-row trein">
     <div class="kpi"><div class="l">Técnicos</div><div class="v">${people.length}</div><div class="s">cadastrados na base</div></div>
@@ -3198,7 +3343,7 @@ function renderAsecDash(){
   }
 
   return `<div class="page-h" style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:12px;justify-content:space-between">
-    <div><h1>Dashboard ASEC Toyota</h1><p>Auditorias · NC · Assertividade · Dealer Evaluation · dados live do checklist</p></div>
+    <div><h1>Dashboard ASEC Toyota</h1></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-g" id="btnRelAsecPdf">📄 Relatório PDF</button><button type="button" class="btn btn-g" id="btnAsecRefresh" style="flex-shrink:0">↻ Atualizar DataBase</button></div>
   </div>
   <div class="kpi-row">
@@ -3250,7 +3395,7 @@ function renderMetroDash(){
   const byTipo={};
   all.forEach(i=>{const t=i.tipo||'Outro';byTipo[t]=(byTipo[t]||0)+1});
   const barT=Object.entries(byTipo).map(([l,v])=>({l,v})).sort((a,b)=>b.v-a.v);
-  return `<div class="page-h" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:12px"><div><h1>Dashboard Metrologia</h1><p>ISO 9001 · 7.1.5 · ${all.length} instrumentos</p></div><button type="button" class="btn btn-g" id="btnRelMetroPdf">📄 Relatório PDF</button></div>
+  return `<div class="page-h" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:12px"><div><h1>Dashboard Metrologia</h1></div><button type="button" class="btn btn-g" id="btnRelMetroPdf">📄 Relatório PDF</button></div>
   <div class="kpi-row">
     <div class="kpi feat"><div class="l">Instrumentos</div><div class="v">${all.length}</div><div class="s">cadastrados</div></div>
     <div class="kpi"><div class="l">Vencidos</div><div class="v">${counts['Vencido']||0}</div><div class="s">recalibrar</div></div>
