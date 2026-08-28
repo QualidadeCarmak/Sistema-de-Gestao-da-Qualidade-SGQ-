@@ -611,6 +611,7 @@ async function deleteTecnicoFromCloud(row) {
 }
 
 async function deleteDocFromCloud(row) {
+  if (typeof canEdit==='function' && !canEdit()) { console.warn('delete bloqueado: viewer'); return false; }
   if (!sessionStorage.getItem("sgq_access")) return false;
   try {
     let id = row && row.id;
@@ -632,6 +633,7 @@ async function deleteDocFromCloud(row) {
 }
 
 async function deleteFluxoFromCloud(row) {
+  if (typeof canEdit==='function' && !canEdit()) { console.warn('delete bloqueado: viewer'); return false; }
   if (!sessionStorage.getItem("sgq_access")) return false;
   try {
     let id = row && row.id;
@@ -657,6 +659,7 @@ async function deleteFluxoFromCloud(row) {
 }
 
 async function deleteInstrumentoFromCloud(row) {
+  if (typeof canEdit==='function' && !canEdit()) { console.warn('delete bloqueado: viewer'); return false; }
   if (!sessionStorage.getItem("sgq_access")) return false;
   try {
     let id = row && row.id;
@@ -735,6 +738,7 @@ async function migrateRhToGpDocs(){
 }
 
 async function pushDocToCloud(row) {
+  if (typeof canEdit==='function' && !canEdit()) { console.warn('pushDoc bloqueado: viewer'); return; }
   if (!sessionStorage.getItem('sgq_access')) return;
   const payload = {
     codigo: row.codigo, tipo: row.tipo || null, titulo: row.titulo,
@@ -764,6 +768,7 @@ async function pushDocToCloud(row) {
 }
 
 async function pushFluxoToCloud(row) {
+  if (typeof canEdit==='function' && !canEdit()) { console.warn('pushFluxo bloqueado: viewer'); return; }
   if (!sessionStorage.getItem('sgq_access')) return;
   try {
     const payload = { area: row.area, processo: row.processo, status: row.status || "Não Iniciado", obs: row.obs || null, updated_at: new Date().toISOString() };
@@ -779,6 +784,7 @@ async function pushFluxoToCloud(row) {
 }
 
 async function pushNcToCloud(row) {
+  if (typeof canEdit==='function' && !canEdit()) { console.warn('push bloqueado: viewer'); return; }
   if (!sessionStorage.getItem('sgq_access')) return;
   try {
     const mesIso = dealerMesToIso(row.mes);
@@ -807,6 +813,7 @@ async function pushNcToCloud(row) {
 }
 
 async function deleteNcFromCloud(rowOrId) {
+  if (typeof canEdit==='function' && !canEdit()) { console.warn('delete bloqueado: viewer'); return false; }
   if (!sessionStorage.getItem("sgq_access")) return false;
   try {
     let id = typeof rowOrId === "object" && rowOrId ? rowOrId.id : rowOrId;
@@ -841,6 +848,7 @@ function rebuildNcSplits() {
 }
 
 async function pushDealerToCloud(row) {
+  if (typeof canEdit==='function' && !canEdit()) { console.warn('push bloqueado: viewer'); return; }
   if (!sessionStorage.getItem('sgq_access')) return;
   try {
     const mesIso = dealerMesToIso(row.mes);
@@ -869,6 +877,7 @@ async function pushDealerToCloud(row) {
 }
 
 async function deleteDealerFromCloud(rowOrId) {
+  if (typeof canEdit==='function' && !canEdit()) { console.warn('delete bloqueado: viewer'); return false; }
   if (!sessionStorage.getItem("sgq_access")) return false;
   try {
     let id = typeof rowOrId === "object" && rowOrId ? rowOrId.id : rowOrId;
@@ -907,6 +916,7 @@ function dealerMesToIso(mes) {
 }
 
 async function pushInstrumentoToCloud(row) {
+  if (typeof canEdit==='function' && !canEdit()) { console.warn('push bloqueado: viewer'); return; }
   if (!sessionStorage.getItem("sgq_access")) return;
   try {
     const payload = {
@@ -1300,11 +1310,29 @@ function saveDB(){
 
 
 /* AUTH */
+function isMaster(){
+  return (sessionStorage.getItem('sgq_role')||'') === 'master';
+}
 function isViewer(){
-  return (sessionStorage.getItem('sgq_role')||'') === 'viewer';
+  /* qualquer um que não seja master é tratado como visualização no SGQ */
+  return !isMaster();
 }
 function canEdit(){
-  return !isViewer();
+  return isMaster();
+}
+/** Logins permitidos no SGQ: master ou colab (viewer sem área de auditoria). */
+function sgqSessionAllowed(){
+  const role = (sessionStorage.getItem('sgq_role')||'').toLowerCase();
+  const email = (sessionStorage.getItem('sgq_email')||'').toLowerCase();
+  const area = (sessionStorage.getItem('sgq_area')||'').toLowerCase();
+  if(role === 'master') return true;
+  if(role === 'viewer' && !area) return true; /* colab */
+  if(email === 'colab@carmak.com.br') return true;
+  if(email === 'calidadecarmak@gmail.com') return true;
+  /* áreas ASEC nunca no SGQ */
+  if(['alm','ofi','pos','seg','gp','rh'].indexOf(area) >= 0) return false;
+  if(/^(gp|almox|oficina|posvenda|seguranca)@carmak\.com\.br$/.test(email)) return false;
+  return role === 'master';
 }
 
 function collectNotifications(){
@@ -1433,14 +1461,18 @@ async function loadSgqProfile(userId, email){
   }
 
   const area = profile && profile.area ? String(profile.area).trim() : '';
-  const AREA_LOGINS = ['alm','ofi','pos','seg','gp'];
-  const isAreaLogin = !!(area && AREA_LOGINS.indexOf(area.toLowerCase()) >= 0);
+  const AREA_KEYS = ['alm','ofi','pos','seg','gp','rh'];
+  const isAreaLogin = !!(area && AREA_KEYS.indexOf(area.toLowerCase()) >= 0);
+  const isAreaEmail = /^(gp|almox|oficina|posvenda|seguranca|rh)@carmak\.com\.br$/i.test(em);
 
   /* SGQ: só master OU viewer global (colab, sem área de auditoria) */
+  if(isAreaLogin || isAreaEmail){
+    throw new Error('Este login é exclusivo do checklist ASEC (área auditada). Use a página de Relatório de Auditoria ASEC.');
+  }
   if(role === 'master') return 'master';
-  if(role === 'viewer' && !isAreaLogin) return 'viewer';
+  if(role === 'viewer') return 'viewer';
 
-  throw new Error('Este login é exclusivo do checklist ASEC (área auditada). Use a página de Relatório de Auditoria ASEC.');
+  throw new Error('Este login não tem permissão no portal SGQ. Use Qualidade (master) ou colab@carmak.com.br.');
 }
 
 async function doLogin(){
@@ -1460,10 +1492,17 @@ async function doLogin(){
     const user = data.user || (session && session.user);
     const access = (session && (session.access_token || session.accessToken)) || null;
     if(!access) throw new Error('Sessão sem token');
+    /* IMPORTANTE: valida perfil/permissão ANTES de gravar sessão (evita F5 com acesso liberado) */
+    sessionStorage.setItem('sgq_access', access); /* token só para o GET de profiles */
+    let role;
+    try {
+      role = await loadSgqProfile(user && user.id, (user && user.email) || u);
+    } catch (gateErr) {
+      try { sessionStorage.removeItem('sgq_access'); } catch(e){}
+      throw gateErr;
+    }
     sessionStorage.setItem('sgq_ok','1');
     sessionStorage.setItem('sgq_email', (user && user.email) || u);
-    sessionStorage.setItem('sgq_access', access);
-    const role = await loadSgqProfile(user && user.id, (user && user.email) || u);
     sessionStorage.setItem('sgq_role', role);
     applyRoleUI();
     try{ bindNotifications(); }catch(e){}
@@ -1482,6 +1521,14 @@ async function doLogin(){
     });
   }catch(e){
     console.error(e);
+    try{
+      sessionStorage.removeItem('sgq_ok');
+      sessionStorage.removeItem('sgq_email');
+      sessionStorage.removeItem('sgq_access');
+      sessionStorage.removeItem('sgq_role');
+      sessionStorage.removeItem('sgq_area');
+      sessionStorage.removeItem('sgq_name');
+    }catch(x){}
     err.classList.remove('loading');
     err.style.background='';
     err.style.color='';
@@ -4072,7 +4119,21 @@ function closeModal(){document.getElementById('modalBg').classList.remove('on')}
 document.getElementById('modalBg').addEventListener('click',e=>{if(e.target.id==='modalBg')closeModal()});
 
 /* boot */
-if(sessionStorage.getItem('sgq_ok')==='1'){
+(function bootSgq(){
+  if(sessionStorage.getItem('sgq_ok')!=='1') return;
+  /* Revalida sessão: área (gp/almox/…) não fica no SGQ mesmo com cache antigo */
+  if(typeof sgqSessionAllowed === 'function' && !sgqSessionAllowed()){
+    console.warn('[SGQ] sessão inválida para este portal — limpando');
+    try{
+      sessionStorage.removeItem('sgq_ok');
+      sessionStorage.removeItem('sgq_email');
+      sessionStorage.removeItem('sgq_access');
+      sessionStorage.removeItem('sgq_role');
+      sessionStorage.removeItem('sgq_area');
+      sessionStorage.removeItem('sgq_name');
+    }catch(e){}
+    return;
+  }
   document.getElementById('login').classList.add('hidden');
   document.getElementById('guia').classList.add('on');
   applyRoleUI();
@@ -4089,7 +4150,7 @@ if(sessionStorage.getItem('sgq_ok')==='1'){
       startCloudAutoSync();
     });
   }
-}
+})();
 </script>
 </body>
 </html>
