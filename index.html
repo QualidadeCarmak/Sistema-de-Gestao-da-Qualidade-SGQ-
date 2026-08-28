@@ -703,16 +703,18 @@ async function deleteInstrumentoFromCloud(row) {
 /** Migra códigos/área RH → GP (lista mestra e fluxos) e grava na nuvem */
 async function migrateRhToGpDocs(){
   if(typeof isViewer==="function" && isViewer()) return 0;
+  if(sessionStorage.getItem("sgq_migrated_rh_gp")==="1") return 0;
   let n=0;
   const docs=DB.docs||[];
   for(const d of docs){
     let ch=false;
-    const oldCod=d.codigo||"";
-    if(/-RH-|_RH_|\/RH/i.test(oldCod) || /RH/i.test(oldCod)){
-      const neu=oldCod.replace(/RH/gi,"GP");
-      if(neu!==oldCod){ d.codigo=neu; ch=true; }
+    const oldCod=String(d.codigo||"");
+    // só códigos com -RH- (não troca GP nem outras letras)
+    if(/-RH-/i.test(oldCod)){
+      d.codigo=oldCod.replace(/-RH-/gi,"-GP-");
+      ch=true;
     }
-    if(d.area && /recursos\s*humanos|^\s*RH\s*$/i.test(String(d.area))){
+    if(d.area && /recursos\s*humanos/i.test(String(d.area))){
       d.area="Gente & Performance"; ch=true;
     }
     if(ch){
@@ -722,12 +724,13 @@ async function migrateRhToGpDocs(){
   }
   const flux=DB.fluxos||[];
   for(const f of flux){
-    if(f.area && /recursos\s*humanos|^\s*RH\s*$/i.test(String(f.area))){
+    if(f.area && /recursos\s*humanos/i.test(String(f.area))){
       f.area="Gente & Performance";
       n++;
       try{ if(typeof pushFluxoToCloud==="function") await pushFluxoToCloud(f); }catch(e){}
     }
   }
+  sessionStorage.setItem("sgq_migrated_rh_gp","1");
   if(n){ try{ saveDB(); }catch(e){} console.log("migrateRhToGp:", n, "itens"); }
   return n;
 }
@@ -1125,7 +1128,7 @@ const SEED={"docs": [{"id": "d1", "codigo": "PP-ALM-01", "tipo": "PP", "titulo":
 /* ===== LISTAS MESTRES (fixas) ===== */
 const LISTA_AREAS = [
   "Almoxarifado","Comercial","Compras","Contábil","Financeiro","Fiscal",
-  "Meio Ambiente","Operacional","Qualidade","Recursos Humanos","Gente & Performance",
+  "Meio Ambiente","Operacional","Qualidade","Gente & Performance",
   "Segurança do Trabalho","Suporte Técnico","T.I."
 ];
 const LISTA_FLUX_STATUS = ["Não Iniciado","Em andamento","Finalizado","Obsoleto"];
@@ -1307,23 +1310,31 @@ function canEdit(){
 
 function collectNotifications(){
   const items=[];
-  const docs=(DB.docs||[]).map(d=>typeof enrichDoc==="function"?enrichDoc(d):d);
-  const nVenc=docs.filter(d=>d.st==="Vencido").length;
-  const n30=docs.filter(d=>d.st==="Vence em 30 dias").length;
-  if(nVenc) items.push({lvl:"bad", title:"Documentos vencidos", body:nVenc+" documento(s) com revisão atrasada na lista mestra.", go:"sgq-dash"});
-  if(n30) items.push({lvl:"warn", title:"Revisões em 30 dias", body:n30+" documento(s) vencem nos próximos 30 dias.", go:"sgq-docs"});
-  const inst=(DB.instruments||[]).map(i=>typeof enrichInst==="function"?enrichInst(i):i);
-  const iv=inst.filter(i=>i.st==="Vencido"||i.st==="Vence em 30 dias").length;
-  const isd=inst.filter(i=>i.st==="Sem data"||(!i.ultima && !i.proxima)).length;
-  if(iv) items.push({lvl:"bad", title:"Metrologia", body:iv+" instrumento(s) vencidos ou a vencer em 30 dias.", go:"metro-dash"});
-  if(isd) items.push({lvl:"warn", title:"Calibração sem data", body:isd+" instrumento(s) sem histórico de calibração.", go:"metro-lista"});
-  const people=DB.people||[];
-  if(people.length){
-    const baixo=people.filter(p=>(typeof personPct==="function"?personPct(p):0)<50).length;
-    if(baixo) items.push({lvl:"warn", title:"Capacitação", body:baixo+" técnico(s) com conclusão abaixo de 50%.", go:"trein-dash"});
-  }
-  const flux=(DB.fluxos||[]).filter(f=>!/finaliz/i.test(String(f.status||""))).length;
-  if(flux) items.push({lvl:"ok", title:"Fluxogramas em aberto", body:flux+" processo(s) ainda não finalizados no mapeamento.", go:"sgq-fluxo"});
+  try{
+    const docs=(DB.docs||[]).map(d=>typeof enrichDoc==="function"?enrichDoc(d):d);
+    const nVenc=docs.filter(d=>d.st==="Vencido").length;
+    const n30=docs.filter(d=>d.st==="Vence em 30 dias").length;
+    if(nVenc) items.push({lvl:"bad", title:"Documentos vencidos", body:nVenc+" documento(s) com revisão atrasada na lista mestra.", go:"sgq-dash"});
+    if(n30) items.push({lvl:"warn", title:"Revisões em 30 dias", body:n30+" documento(s) vencem nos próximos 30 dias.", go:"sgq-docs"});
+    const inst=(DB.instruments||[]).map(i=>typeof enrichInst==="function"?enrichInst(i):i);
+    const iv=inst.filter(i=>{
+      const st=i.status||i.st||"";
+      return st==="Vencido"||st==="Vence em 30 dias";
+    }).length;
+    const isd=inst.filter(i=>{
+      const st=i.status||i.st||"";
+      return st==="Sem data"||(!i.ultima && !(i.proxima));
+    }).length;
+    if(iv) items.push({lvl:"bad", title:"Metrologia", body:iv+" instrumento(s) vencidos ou a vencer em 30 dias.", go:"metro-dash"});
+    if(isd) items.push({lvl:"warn", title:"Calibração sem data", body:isd+" instrumento(s) sem histórico de calibração.", go:"metro-lista"});
+    const people=DB.people||[];
+    if(people.length && typeof personPct==="function"){
+      const baixo=people.filter(p=>personPct(p)<50).length;
+      if(baixo) items.push({lvl:"warn", title:"Capacitação", body:baixo+" técnico(s) com conclusão abaixo de 50%.", go:"trein-dash"});
+    }
+    const flux=(DB.fluxos||[]).filter(f=>!/finaliz/i.test(String(f.status||""))).length;
+    if(flux) items.push({lvl:"ok", title:"Fluxogramas em aberto", body:flux+" processo(s) ainda não finalizados no mapeamento.", go:"sgq-fluxo"});
+  }catch(e){ console.warn("collectNotifications", e); }
   return items;
 }
 function paintNotifications(){
@@ -1445,13 +1456,18 @@ async function doLogin(){
     const role = await loadSgqProfile(user && user.id, (user && user.email) || u);
     sessionStorage.setItem('sgq_role', role);
     applyRoleUI();
-    err.textContent='Sincronizando dados…';
-    err.classList.add('show','loading');
+    try{ bindNotifications(); }catch(e){}
     loadDB();
-    await pullAllFromCloud();
+    // entra na app na hora — sync em segundo plano (não trava em "Entrando…")
     err.classList.remove('show','loading');
     document.getElementById('login').classList.add('hidden');
     document.getElementById('guia').classList.add('on');
+    pullAllFromCloud().then(function(ok){
+      console.log('sync pós-login', ok);
+      try{ paintNotifications(); }catch(e){}
+    }).catch(function(e){
+      console.warn('sync pós-login', e);
+    });
   }catch(e){
     console.error(e);
     err.classList.remove('loading');
@@ -4014,10 +4030,13 @@ if(sessionStorage.getItem('sgq_ok')==='1'){
   document.getElementById('login').classList.add('hidden');
   document.getElementById('guia').classList.add('on');
   applyRoleUI();
+  try{ bindNotifications(); }catch(e){}
   loadDB();
+  try{ paintNotifications(); }catch(e){}
   if(sessionStorage.getItem('sgq_access')){
     pullAllFromCloud().then(ok=>{
       console.log('boot sync', ok);
+      try{ paintNotifications(); }catch(e){}
     }).catch(e=>console.warn(e));
   }
 }
