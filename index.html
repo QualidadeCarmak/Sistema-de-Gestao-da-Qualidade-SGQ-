@@ -100,6 +100,8 @@ body.viewer-mode #btnNewTr,
 body.viewer-mode #btnNewMt,
 body.viewer-mode #btnNewDealer,
 body.viewer-mode .btn-d,
+body.viewer-mode #themeGrid,
+body.viewer-mode .sp-sec:has(#themeGrid),
 body.viewer-mode [data-ed],
 body.viewer-mode [data-del]{display:none!important}
 .viewer-banner{background:#eef6ff;border:1px solid #b6d4fe;color:#0b3d91;padding:.55rem 1rem;border-radius:10px;margin-bottom:12px;font-size:.85rem;font-weight:600}
@@ -421,7 +423,7 @@ tr:hover td{background:var(--tint)}
         </div>
       </div>
     </div>
-    <div class="sp-sec">
+    <div class="sp-sec" id="themeSection">
       <div class="sp-lab">Alterar layout</div>
       <div class="theme-grid" id="themeGrid"></div>
     </div>
@@ -682,24 +684,31 @@ async function deleteInstrumentoFromCloud(row) {
 
 async function pushDocToCloud(row) {
   if (!sessionStorage.getItem('sgq_access')) return;
-  try {
-    const payload = {
-      codigo: row.codigo, tipo: row.tipo || null, titulo: row.titulo,
-      area: row.area || null, responsavel: row.responsavel || null, gestor: row.gestor || null,
-      controle: row.controle || null, revisao_atual: row.revisao_atual || null,
-      emissao: row.emissao || null, ultima: row.ultima || null, revisao: row.revisao || null,
-      criticidade: row.criticidade || null, frequencia: row.frequencia || null,
-      prioridade: row.prioridade || null, norma: row.norma || null,
-      situacao: row.situacao || "Ativo", obs: row.obs || null,
-      updated_at: new Date().toISOString()
-    };
-    const existing = await sbRest("GET", "documents", { query: "codigo=eq." + encodeURIComponent(row.codigo) + "&select=id" });
-    if (existing && existing[0] && existing[0].id) {
-      await sbRest("PATCH", "documents", { query: "id=eq." + existing[0].id, body: payload });
-    } else {
-      await sbRest("POST", "documents", { body: payload });
+  const payload = {
+    codigo: row.codigo, tipo: row.tipo || null, titulo: row.titulo,
+    area: row.area || null, responsavel: row.responsavel || null, gestor: row.gestor || null,
+    controle: row.controle || null, revisao_atual: row.revisao_atual || null,
+    emissao: row.emissao || null, ultima: row.ultima || null, revisao: row.revisao || null,
+    criticidade: row.criticidade || null, frequencia: row.frequencia || null,
+    prioridade: row.prioridade || null, norma: row.norma || null,
+    situacao: row.situacao || "Ativo", obs: row.obs || null,
+    updated_at: new Date().toISOString()
+  };
+  // Preferência: atualizar pelo id (permite trocar o código, ex.: PQ-RH-01 → PQ-GP-01)
+  if (row.id) {
+    try {
+      await sbRest("PATCH", "documents", { query: "id=eq." + encodeURIComponent(row.id), body: payload });
+      return;
+    } catch (e) {
+      console.warn("pushDocToCloud patch by id", e);
     }
-  } catch (e) { console.warn("pushDocToCloud", e); }
+  }
+  const existing = await sbRest("GET", "documents", { query: "codigo=eq." + encodeURIComponent(row.codigo) + "&select=id" });
+  if (existing && existing[0] && existing[0].id) {
+    await sbRest("PATCH", "documents", { query: "id=eq." + existing[0].id, body: payload });
+  } else {
+    await sbRest("POST", "documents", { body: payload });
+  }
 }
 
 async function pushFluxoToCloud(row) {
@@ -1143,7 +1152,8 @@ function daysUntil(iso){
   return Math.round((d-n)/86400000);
 }
 function statusDoc(d){
-  if(d.situacao && /obsoleto|cancelado/i.test(d.situacao)) return 'Obsoleto';
+  if(d.situacao && /cancelado/i.test(String(d.situacao))) return 'Cancelado';
+  if(d.situacao && /obsoleto/i.test(String(d.situacao))) return 'Obsoleto';
   let rev=d.revisao;
   if(!rev && d.ultima){
     const f=d.frequencia||critFreq(d.criticidade);
@@ -1159,6 +1169,8 @@ function statusDoc(d){
 function badge(st){
   if(/Em dia|Finalizado|ok/i.test(st)) return 'ok';
   if(/30|90|Andamento|Aguardando|Sem data/i.test(st)) return 'warn';
+  if(/Cancelado/i.test(st)) return 'bad';
+  if(/Obsoleto/i.test(st)) return 'warn';
   if(/Vencido|Não Iniciado/i.test(st)) return 'bad';
   return 'off';
 }
@@ -1259,7 +1271,11 @@ function applyRoleUI(){
   document.body.classList.toggle('viewer-mode', isViewer());
   const chip=document.getElementById('userChip');
   if(chip) chip.textContent = displayUserLabel();
+  // Tema: só master
+  const themeSec = document.getElementById('themeSection');
+  if(themeSec) themeSec.style.display = isViewer() ? 'none' : '';
 }
+
 
 async function loadSgqProfile(userId, email){
   try{
@@ -1382,15 +1398,17 @@ function openSettings(){
       <div class="to-name">${t.name}</div>
     </button>`).join('');
     grid.querySelectorAll('[data-theme-opt]').forEach(b=>b.onclick=()=>{
+      if(typeof isViewer==='function' && isViewer()){
+        alert('Somente o perfil Qualidade (master) pode alterar o tema visual.');
+        return;
+      }
       if(window.applyTheme) window.applyTheme(b.getAttribute('data-theme-opt'));
       grid.querySelectorAll('.theme-opt').forEach(x=>x.classList.toggle('active',x===b));
     });
   }
-  /* visualizador: não altera senha da conta compartilhada (só a Qualidade controla) */
-  document.querySelectorAll('#settingsPanel .sp-sec').forEach(sec=>{
-    const lab=sec.querySelector('.sp-lab');
-    if(lab && /senha/i.test(lab.textContent||'')) sec.style.display = isViewer()?'none':'';
-  });
+  /* Tema: só master. Viewer: foto, senha, sincronizar e limpar cache */
+  const themeSec=document.getElementById('themeSection');
+  if(themeSec) themeSec.style.display = isViewer() ? 'none' : '';
   document.getElementById('settingsPanel').classList.add('on');
   document.getElementById('settingsScrim').classList.add('on');
 }
@@ -2514,7 +2532,8 @@ function renderDocsShell(){
   <div class="toolbar">
     <div class="fg"><label>Busca</label><input id="docQ" placeholder="Código, título, área, responsável"></div>
     <div class="fg"><label>Status</label><select id="docSt"><option value="">Todos</option>
-      <option>Em dia</option><option>Vence em 30 dias</option><option>Vence em 90 dias</option><option>Vencido</option><option>Sem data</option></select></div>
+      <option>Em dia</option><option>Vence em 30 dias</option><option>Vence em 90 dias</option><option>Vencido</option><option>Sem data</option>
+      <option>Ativo</option><option>Obsoleto</option><option>Cancelado</option></select></div>
     <div class="fg"><label>Área</label><select id="docArea"><option value="">Todas</option></select></div>
     <button type="button" class="btn btn-g" id="btnNewDoc">+ Documento</button>
   </div>
@@ -2535,7 +2554,11 @@ function bindDocs(){
     const ar=document.getElementById('docArea').value;
     let rows=DB.docs.map(enrichDoc);
     if(q)rows=rows.filter(d=>(d.codigo+' '+d.titulo+' '+(d.area||'')+' '+(d.responsavel||'')).toLowerCase().includes(q));
-    if(st)rows=rows.filter(d=>d.st===st);
+    if(st){
+      if(st==='Ativo') rows=rows.filter(d=>!/obsoleto|cancelado/i.test(String(d.situacao||'')) && d.st!=='Obsoleto' && d.st!=='Cancelado');
+      else if(st==='Obsoleto'||st==='Cancelado') rows=rows.filter(d=>d.st===st || new RegExp(st,'i').test(String(d.situacao||'')));
+      else rows=rows.filter(d=>d.st===st);
+    }
     if(ar)rows=rows.filter(d=>d.area===ar);
     document.getElementById('docBody').innerHTML=rows.map(d=>`<tr>
       <td><b>${esc(d.codigo)}</b></td><td>${esc(d.tipo||'—')}</td><td>${esc(d.titulo)}</td><td>${esc(d.area)}</td>
