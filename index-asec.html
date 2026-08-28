@@ -620,6 +620,17 @@ async function doLogin() {
       } catch (e) {}
       return;
     }
+    /* ASEC: master (Qualidade) ou viewer COM área (Alm/Ofi/Pos/Seg/GP). Colab do SGQ não entra aqui. */
+    if (!asecLoginAllowed(profile)) {
+      showErr("Este login é exclusivo do portal SGQ. Use o sistema de Qualidade (master ou colab).");
+      try { if (supabase) await supabase.auth.signOut(); } catch (e) {}
+      try {
+        localStorage.removeItem("sb_access_token");
+        localStorage.removeItem("sb_refresh_token");
+      } catch (e) {}
+      currentUser = null;
+      return;
+    }
     currentUser = profile;
     if (typeof enterApp === "function") {
       enterApp();
@@ -699,6 +710,22 @@ async function restQuery(path, options) {
 function isMaster() {
   return currentUser && currentUser.role === "master";
 }
+
+/** Quem pode entrar no ASEC: master OU viewer com área de auditoria (não o colab do SGQ). */
+function asecLoginAllowed(profile) {
+  if (!profile) return false;
+  var role = String(profile.role || "").toLowerCase();
+  var area = String(profile.area || "").trim();
+  var em = String(profile.email || "").toLowerCase();
+  if (role === "master" || role === "admin" || role === "qualidade") return true;
+  if (em === "calidadecarmak@gmail.com") return true;
+  /* colab / viewer global do SGQ */
+  if (em === "colab@carmak.com.br" || (!area && (role === "viewer" || role === "visualizador"))) return false;
+  var allowed = { Alm:1, Ofi:1, Pos:1, Seg:1, GP:1, RH:1 };
+  if ((role === "viewer" || role === "visualizador") && allowed[area]) return true;
+  return false;
+}
+
 function canAccessArea(areaKey) {
   if (!currentUser) return false;
   if (currentUser.role === "master") return true;
