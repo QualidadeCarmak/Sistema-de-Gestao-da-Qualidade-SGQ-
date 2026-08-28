@@ -1464,8 +1464,10 @@ async function doLogin(){
     pullAllFromCloud().then(function(ok){
       console.log('sync pós-login', ok);
       try{ paintNotifications(); }catch(e){}
+      startCloudAutoSync();
     }).catch(function(e){
       console.warn('sync pós-login', e);
+      startCloudAutoSync();
     });
   }catch(e){
     console.error(e);
@@ -1479,7 +1481,41 @@ async function doLogin(){
   }
 }
 
+
+/* Auto-sync com Supabase a cada 1h (só com aba aberta e logado) */
+var _sgqSyncTimer = null;
+var _sgqSyncBusy = false;
+var SGQ_SYNC_MS = 60 * 60 * 1000; // 1 hora
+async function runScheduledCloudSync(){
+  if(_sgqSyncBusy) return;
+  if(!sessionStorage.getItem('sgq_access') || sessionStorage.getItem('sgq_ok')!=='1') return;
+  _sgqSyncBusy = true;
+  try{
+    console.log('[SGQ] auto-sync', new Date().toISOString());
+    const ok = await pullAllFromCloud();
+    try{ paintNotifications(); }catch(e){}
+    if(typeof view==='string' && view && typeof showView==='function'){
+      try{ showView(view); }catch(e){}
+    }
+    console.log('[SGQ] auto-sync ok', ok);
+  }catch(e){
+    console.warn('[SGQ] auto-sync', e);
+  }finally{
+    _sgqSyncBusy = false;
+  }
+}
+function startCloudAutoSync(){
+  stopCloudAutoSync();
+  if(!sessionStorage.getItem('sgq_access')) return;
+  _sgqSyncTimer = setInterval(runScheduledCloudSync, SGQ_SYNC_MS);
+  console.log('[SGQ] auto-sync agendado a cada 1h');
+}
+function stopCloudAutoSync(){
+  if(_sgqSyncTimer){ clearInterval(_sgqSyncTimer); _sgqSyncTimer = null; }
+}
+
 function doLogout(){
+  stopCloudAutoSync();
   sbSignOut();
   sessionStorage.removeItem('sgq_role');
   document.body.classList.remove('viewer-mode');
@@ -4036,7 +4072,11 @@ if(sessionStorage.getItem('sgq_ok')==='1'){
     pullAllFromCloud().then(ok=>{
       console.log('boot sync', ok);
       try{ paintNotifications(); }catch(e){}
-    }).catch(e=>console.warn(e));
+      startCloudAutoSync();
+    }).catch(e=>{
+      console.warn(e);
+      startCloudAutoSync();
+    });
   }
 }
 </script>
