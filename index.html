@@ -1529,9 +1529,12 @@ function applyRoleUI(){
   document.body.classList.toggle('viewer-mode', isViewer());
   const chip=document.getElementById('userChip');
   if(chip) chip.textContent = displayUserLabel();
-  // Tema: só master
+  // Tema: só master pode escolher; colab/viewer sempre Safira + dourado
   const themeSec = document.getElementById('themeSection');
   if(themeSec) themeSec.style.display = isViewer() ? 'none' : '';
+  if(isViewer() && typeof window.applyTheme === 'function'){
+    window.applyTheme('safira');
+  }
 }
 
 
@@ -1711,7 +1714,13 @@ const THEMES=[
     document.querySelectorAll('[data-theme-opt]').forEach(b=>b.classList.toggle('active',b.getAttribute('data-theme-opt')===t));
   }
   window.applyTheme=apply;
-  try{apply(localStorage.getItem(KEY)||'verde')}catch(e){apply('verde')}
+  try{
+    var role=(sessionStorage.getItem('sgq_role')||'').toLowerCase();
+    var email=(sessionStorage.getItem('sgq_email')||'').toLowerCase();
+    var isColab = role==='viewer' || email==='colab@carmak.com.br' || email.indexOf('colab@')>=0;
+    if(isColab) apply('safira');
+    else apply(localStorage.getItem(KEY)||'verde');
+  }catch(e){apply('verde')}
 })();
 
 function openSettings(){
