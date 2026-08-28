@@ -1399,7 +1399,10 @@ function applyRoleUI(){
 }
 
 
+/* Perfis permitidos no SGQ: master (Qualidade) e viewer global (colab). Logins de área vão para o ASEC. */
 async function loadSgqProfile(userId, email){
+  const em = String(email||'').toLowerCase().trim();
+  let profile = null;
   try{
     let rows=null;
     if(userId){
@@ -1408,28 +1411,36 @@ async function loadSgqProfile(userId, email){
     if((!rows||!rows.length) && email){
       rows = await sbRest('GET','profiles',{query:'email=eq.'+encodeURIComponent(email)+'&select=id,email,role,full_name,area'});
     }
-    const p = rows && rows[0];
-    if(p){
-      if(p.full_name) sessionStorage.setItem('sgq_name', String(p.full_name).trim());
-      else if(p.email && /qualidade/i.test(p.email)) sessionStorage.setItem('sgq_name', 'Qualidade Carmak');
-    }
-    if(p && p.role){
-      const role = String(p.role).toLowerCase();
-      if(role==='viewer' || role==='visualizador') return 'viewer';
-      if(role==='master' || role==='admin' || role==='qualidade') return 'master';
-      return role;
+    profile = rows && rows[0] ? rows[0] : null;
+    if(profile){
+      if(profile.full_name) sessionStorage.setItem('sgq_name', String(profile.full_name).trim());
+      else if(profile.email && /qualidade/i.test(profile.email)) sessionStorage.setItem('sgq_name', 'Qualidade Carmak');
+      if(profile.area) sessionStorage.setItem('sgq_area', String(profile.area).trim());
+      else sessionStorage.removeItem('sgq_area');
     }
   }catch(e){ console.warn('loadSgqProfile', e); }
-  /* fallback: e-mails conhecidos de visualização compartilhada */
-  const em = String(email||'').toLowerCase();
-  if(
-    em === 'colab@carmak.com.br' ||
-    em.indexOf('colab@')>=0 ||
-    em.indexOf('visualiz')>=0 ||
-    em.indexOf('viewer')>=0 ||
-    em.indexOf('leitura')>=0
-  ) return 'viewer';
-  return 'master';
+
+  let role = null;
+  if(profile && profile.role){
+    const r = String(profile.role).toLowerCase();
+    if(r==='viewer' || r==='visualizador') role = 'viewer';
+    else if(r==='master' || r==='admin' || r==='qualidade') role = 'master';
+    else role = r;
+  } else {
+    /* fallback por e-mail se profile ausente */
+    if(em === 'colab@carmak.com.br' || em.indexOf('colab@')>=0) role = 'viewer';
+    else if(em === 'calidadecarmak@gmail.com' || /qualidade/i.test(em)) role = 'master';
+  }
+
+  const area = profile && profile.area ? String(profile.area).trim() : '';
+  const AREA_LOGINS = ['alm','ofi','pos','seg','gp'];
+  const isAreaLogin = !!(area && AREA_LOGINS.indexOf(area.toLowerCase()) >= 0);
+
+  /* SGQ: só master OU viewer global (colab, sem área de auditoria) */
+  if(role === 'master') return 'master';
+  if(role === 'viewer' && !isAreaLogin) return 'viewer';
+
+  throw new Error('Este login é exclusivo do checklist ASEC (área auditada). Use a página de Relatório de Auditoria ASEC.');
 }
 
 async function doLogin(){
