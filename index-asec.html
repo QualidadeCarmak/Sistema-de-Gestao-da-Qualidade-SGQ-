@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://*.supabase.co; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Checklist Auditoria Interna ASEC - Carmak</title>
@@ -9,19 +13,20 @@
 <script src="./supabase.min.js"></script>
 <style>
 :root{
-  --p:#06402b;
-  --pd:#042e1f;
-  --pl:#0a5c3c;
-  --gold:#c8a24d;
-  --gold-d:#a3812f;
-  --gold-lt:#f3e4bb;
-  --s:#1f7a5c;
-  --d:#a4344a;
-  --bg:#f2f4f8;
-  --c:#fff;
-  --b:#dde1ea;
-  --t:#152238;
-  --m:#606c85;
+  /* Tema Safira + dourado (mesmo do SGQ) */
+  --p:#0C2340;
+  --pd:#061220;
+  --pl:#163A5F;
+  --gold:#C4A35A;
+  --gold-d:#A89040;
+  --gold-lt:#E8D5A3;
+  --s:#2F6B4F;
+  --d:#C6483E;
+  --bg:#E6EEF6;
+  --c:#F2F6FA;
+  --b:#C5D3E0;
+  --t:#0C1520;
+  --m:#5A6B7D;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--t);line-height:1.5;min-height:100vh}
@@ -60,14 +65,14 @@ header .titles p{font-size:.85rem;color:var(--gold-lt);margin-top:.15rem;letter-
 .qtx{flex:1;font-size:.95rem}
 .bdg{display:flex;gap:.35rem;flex-wrap:wrap}
 .bd{font-size:.7rem;font-weight:700;padding:.2rem .5rem;border-radius:4px;text-transform:uppercase}
-.bm{background:var(--gold-lt);color:var(--gold-d)}.be{background:#e3f0e4;color:var(--p)}
-.gd{font-size:.82rem;color:var(--m);background:#f5f8f8;padding:.6rem .8rem;border-radius:6px;margin-bottom:.8rem;white-space:pre-line}
+.bm{background:var(--gold-lt);color:var(--gold-d)}.be{background:#E6EEF6;color:var(--p)}
+.gd{font-size:.82rem;color:var(--m);background:#EEF3F8;padding:.6rem .8rem;border-radius:6px;margin-bottom:.8rem;white-space:pre-line}
 .ar{display:flex;flex-direction:column;gap:.9rem}
 .rg{display:flex;gap:.75rem;flex-wrap:wrap}
 .rg label{display:flex;align-items:center;gap:.35rem;cursor:pointer;font-weight:500;padding:.35rem .7rem;border-radius:6px;border:1px solid var(--b)}
 .rg input{accent-color:var(--p)}
-.rg label:has(input:checked){border-color:var(--p);background:#e8f3e9}
-.rg .ol:has(input:checked){border-color:var(--s);background:#d1e7dd}
+.rg label:has(input:checked){border-color:var(--p);background:#E6EEF6}
+.rg .ol:has(input:checked){border-color:var(--s);background:#D8EEE3}
 .rg .nl:has(input:checked){border-color:var(--d);background:#f8d7da}
 .just-box{display:none;margin-top:.5rem}
 .just-box.show{display:block}
@@ -107,7 +112,7 @@ header .titles p{font-size:.85rem;color:var(--gold-lt);margin-top:.15rem;letter-
 /* ===== Login ===== */
 #login-screen{
   position:fixed;inset:0;z-index:5000;
-  background:#06402b;
+  background:#061220;
   display:flex;align-items:center;justify-content:center;
   padding:1.5rem;
 }
@@ -134,10 +139,10 @@ header .titles p{font-size:.85rem;color:var(--gold-lt);margin-top:.15rem;letter-
   background:rgba(255,255,255,.95);color:#152238;font-size:.95rem;margin-bottom:.9rem;
   font-family:inherit
 }
-.login-card input:focus{outline:2px solid #c8a24d;outline-offset:1px}
+.login-card input:focus{outline:2px solid #C4A35A;outline-offset:1px}
 .login-card .btn-login{
   width:100%;padding:.75rem;border:none;border-radius:8px;
-  background:linear-gradient(135deg,#c8a24d,#a3812f);color:#042e1f;
+  background:linear-gradient(135deg,#D4B56A,#C4A35A);color:#061220;
   font-weight:800;font-size:1rem;cursor:pointer;margin-top:.25rem
 }
 .login-card .btn-login:hover{filter:brightness(1.05)}
@@ -1689,6 +1694,71 @@ function closeLightbox() {
   document.getElementById("lightbox").classList.remove("show");
 }
 
+
+function unidadeFromDealer(dealer) {
+  const d = String(dealer || "");
+  if (/itaj/i.test(d)) return "Itajai";
+  if (/matriz|leopoldo|s[aã]o leopoldo/i.test(d)) return "Matriz";
+  if (/campo grande/i.test(d)) return "Campo Grande";
+  return d.trim() || "Matriz";
+}
+function setorFromArea(areaKey) {
+  const map = {
+    GP: "Gente & Performance", RH: "Gente & Performance",
+    Seg: "Segurança", Pos: "Pós Vendas", Ofi: "Oficina", Alm: "Almoxarifado"
+  };
+  return map[areaKey] || (A[areaKey] && A[areaKey].n) || areaKey;
+}
+function mesPtFromDate(iso) {
+  const MES_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  if (!iso) return MES_PT[new Date().getMonth()];
+  const m = String(iso).match(/^(\d{4})-(\d{2})/);
+  if (m) return MES_PT[parseInt(m[2], 10) - 1] || MES_PT[new Date().getMonth()];
+  const d = new Date(iso);
+  return !isNaN(d) ? MES_PT[d.getMonth()] : MES_PT[new Date().getMonth()];
+}
+async function pushAssertividadeFromReport(opts) {
+  const area = opts.area, dealer = opts.dealer, auditDate = opts.auditDate, scorePct = opts.scorePct;
+  if (scorePct == null || isNaN(Number(scorePct))) return;
+  const unidade = unidadeFromDealer(dealer);
+  const setor = setorFromArea(area);
+  const mes = mesPtFromDate(auditDate);
+  let nota = Number(scorePct);
+  if (nota > 1) nota = nota / 100;
+  if (nota < 0) nota = 0;
+  if (nota > 1) nota = 1;
+  const payload = { unidade: unidade, setor: setor, mes: mes, nota: nota };
+  if (supabase) {
+    const up = await supabase.from("asec_assertividade").upsert(payload, { onConflict: "unidade,setor,mes" });
+    if (up.error) {
+      const q = await supabase.from("asec_assertividade").select("id").eq("unidade", unidade).eq("setor", setor).eq("mes", mes).maybeSingle();
+      if (q.data && q.data.id) {
+        const res = await supabase.from("asec_assertividade").update({ nota: nota }).eq("id", q.data.id);
+        if (res.error) throw res.error;
+      } else {
+        const res = await supabase.from("asec_assertividade").insert(payload);
+        if (res.error) throw res.error;
+      }
+    }
+  } else {
+    const rows = await restQuery(
+      "/rest/v1/asec_assertividade?unidade=eq." + encodeURIComponent(unidade) +
+      "&setor=eq." + encodeURIComponent(setor) +
+      "&mes=eq." + encodeURIComponent(mes) +
+      "&select=id"
+    );
+    if (rows && rows[0] && rows[0].id) {
+      await restQuery("/rest/v1/asec_assertividade?id=eq." + encodeURIComponent(rows[0].id), {
+        method: "PATCH",
+        body: { nota: nota }
+      });
+    } else {
+      await restQuery("/rest/v1/asec_assertividade", { method: "POST", body: payload });
+    }
+  }
+  console.log("assertividade OK", payload);
+}
+
 function calc(k) {
   const qs = A[k].q;
   let an = 0, ok = 0;
@@ -1818,12 +1888,28 @@ async function saveToHistory() {
       if (editingHistoryId) {
         const { error } = await supabase.from("auditorias").update(payload).eq("id", editingHistoryId);
         if (error) throw error;
-        await clearDraft(); alert("Relatório atualizado!");
+        try {
+          await pushAssertividadeFromReport({
+            area: payload.area,
+            dealer: payload.dealer,
+            auditDate: payload.audit_date,
+            scorePct: payload.score
+          });
+        } catch (ae) { console.warn("assertividade", ae); }
+        await clearDraft(); alert("Relatório atualizado! Assertividade registrada no histórico.");
       } else {
         const { data, error } = await supabase.from("auditorias").insert(payload).select("id").single();
         if (error) throw error;
         editingHistoryId = data.id;
-        await clearDraft(); alert("Relatório salvo no histórico!");
+        try {
+          await pushAssertividadeFromReport({
+            area: payload.area,
+            dealer: payload.dealer,
+            auditDate: payload.audit_date,
+            scorePct: payload.score
+          });
+        } catch (ae) { console.warn("assertividade", ae); }
+        await clearDraft(); alert("Relatório salvo no histórico! Assertividade registrada.");
       }
     } else {
       if (editingHistoryId) {
@@ -1831,7 +1917,15 @@ async function saveToHistory() {
           method: "PATCH",
           body: payload
         });
-        await clearDraft(); alert("Relatório atualizado!");
+        try {
+          await pushAssertividadeFromReport({
+            area: payload.area,
+            dealer: payload.dealer,
+            auditDate: payload.audit_date,
+            scorePct: payload.score
+          });
+        } catch (ae) { console.warn("assertividade", ae); }
+        await clearDraft(); alert("Relatório atualizado! Assertividade registrada no histórico.");
       } else {
         var rows = await restQuery("/rest/v1/auditorias", {
           method: "POST",
@@ -1839,7 +1933,15 @@ async function saveToHistory() {
           prefer: "return=representation"
         });
         if (rows && rows[0] && rows[0].id) editingHistoryId = rows[0].id;
-        await clearDraft(); alert("Relatório salvo no histórico!");
+        try {
+          await pushAssertividadeFromReport({
+            area: payload.area,
+            dealer: payload.dealer,
+            auditDate: payload.audit_date,
+            scorePct: payload.score
+          });
+        } catch (ae) { console.warn("assertividade", ae); }
+        await clearDraft(); alert("Relatório salvo no histórico! Assertividade registrada.");
       }
     }
   } catch (e) {
@@ -2074,7 +2176,7 @@ async function getLogoDataURL() {
 function addFooter(doc, pageNum, totalPages) {
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
-  doc.setDrawColor(200, 162, 77);
+  doc.setDrawColor(196, 163, 90);
   doc.setLineWidth(0.4);
   doc.line(14, ph - 12, pw - 14, ph - 12);
   doc.setFontSize(7);
@@ -2102,12 +2204,12 @@ async function generatePDF() {
   const m = 14;
   let y = 0;
 
-  // Verde escuro #06402b = RGB(6, 64, 43)
+  // Safira #0C2340 = RGB(12, 35, 64)
 
   // ===== CABEÇALHO =====
-  doc.setFillColor(6, 64, 43);
+  doc.setFillColor(12, 35, 64);
   doc.rect(0, 0, pw, 26, "F");
-  doc.setFillColor(200, 162, 77);
+  doc.setFillColor(196, 163, 90);
   doc.rect(0, 26, pw, 1.6, "F");
 
   const logoInfo = await getLogoDataURL();
@@ -2156,7 +2258,7 @@ async function generatePDF() {
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9.5);
-  doc.setTextColor(6, 64, 43);
+  doc.setTextColor(12, 35, 64);
   doc.text(dealer, m + 4, y + 11.5);
   doc.text(date, m + 78, y + 11.5);
   doc.text(auditor, m + 115, y + 11.5);
@@ -2216,7 +2318,7 @@ async function generatePDF() {
     body,
     theme: "plain",
     headStyles: {
-      fillColor: [6, 64, 43],
+      fillColor: [12, 35, 64],
       textColor: [243, 228, 187],
       fontSize: 7.5,
       fontStyle: "bold",
@@ -2231,7 +2333,7 @@ async function generatePDF() {
       textColor: [30, 40, 55]
     },
     columnStyles: {
-      0: { cellWidth: 15, fontStyle: "bold", textColor: [6, 64, 43] },
+      0: { cellWidth: 15, fontStyle: "bold", textColor: [12, 35, 64] },
       1: { cellWidth: 98 },
       2: { cellWidth: 28, fontSize: 6.2, textColor: [140, 110, 40] },
       3: { cellWidth: 24, fontStyle: "bold", halign: "center" },
@@ -2261,14 +2363,14 @@ async function generatePDF() {
   // ===== ASSINATURA =====
   if (y > 230) { doc.addPage(); y = 20; }
 
-  doc.setDrawColor(200, 162, 77);
+  doc.setDrawColor(196, 163, 90);
   doc.setLineWidth(0.5);
   doc.line(m, y, pw - m, y);
   y += 8;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.setTextColor(6, 64, 43);
+  doc.setTextColor(12, 35, 64);
   doc.text("Validação do Auditor", m, y);
   y += 10;
 
@@ -2283,7 +2385,7 @@ async function generatePDF() {
   doc.text("Auditor responsável", m + 4, y + 6);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.setTextColor(6, 64, 43);
+  doc.setTextColor(12, 35, 64);
   doc.text(auditor, m + 4, y + 12);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
@@ -2323,9 +2425,9 @@ async function generatePDF() {
 
   if (evs.length) {
     doc.addPage();
-    doc.setFillColor(6, 64, 43);
+    doc.setFillColor(12, 35, 64);
     doc.rect(0, 0, pw, 16, "F");
-    doc.setFillColor(200, 162, 77);
+    doc.setFillColor(196, 163, 90);
     doc.rect(0, 16, pw, 1.4, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
@@ -2338,7 +2440,7 @@ async function generatePDF() {
     for (const it of evs) {
       if (y > 245) {
         doc.addPage();
-        doc.setFillColor(6, 64, 43);
+        doc.setFillColor(12, 35, 64);
         doc.rect(0, 0, pw, 12, "F");
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(9);
@@ -2348,7 +2450,7 @@ async function generatePDF() {
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
-      doc.setTextColor(6, 64, 43);
+      doc.setTextColor(12, 35, 64);
       doc.text(it.i, m, y);
 
       const stTxt = it.s === "ok" ? "Conforme" : it.s === "nok" ? "Não Conforme" : "—";
@@ -2390,7 +2492,7 @@ async function generatePDF() {
           const r = Math.min(imgW / ip.width, imgH / ip.height);
           const w = ip.width * r, h = ip.height * r;
           doc.addImage(im.data, "JPEG", xOff, y, w, h);
-          doc.setDrawColor(200, 162, 77);
+          doc.setDrawColor(196, 163, 90);
           doc.setLineWidth(0.35);
           doc.rect(xOff, y, w, h);
           rowMaxH = Math.max(rowMaxH, h);
