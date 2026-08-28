@@ -281,6 +281,114 @@ tr:hover td{background:var(--tint)}
 .bar-row .fill.warn{background:linear-gradient(90deg,#b8860b,#e0c56a)}
 .bar-row .fill.bad{background:linear-gradient(90deg,#a4344a,#d46b7a)}
 .bar-row .fill.ok{background:linear-gradient(90deg,#2F6B4F,#4a9a72)}
+
+/* ===== Chart entrance animations ===== */
+@keyframes barGrowX {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes barGrowY {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@keyframes donutIn {
+  from { transform: scale(.55) rotate(-100deg); opacity: 0; }
+  to { transform: scale(1) rotate(0); opacity: 1; }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pathDraw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes popIn {
+  from { opacity: 0; transform: scale(.85); }
+  to { opacity: 1; transform: none; }
+}
+.bar-row .fill {
+  transform-origin: left center;
+  animation: barGrowX .85s cubic-bezier(.22,1,.36,1) both;
+}
+.bar-row:nth-child(1) .fill { animation-delay: .05s; }
+.bar-row:nth-child(2) .fill { animation-delay: .1s; }
+.bar-row:nth-child(3) .fill { animation-delay: .15s; }
+.bar-row:nth-child(4) .fill { animation-delay: .2s; }
+.bar-row:nth-child(5) .fill { animation-delay: .25s; }
+.bar-row:nth-child(6) .fill { animation-delay: .3s; }
+.bar-row:nth-child(7) .fill { animation-delay: .35s; }
+.bar-row:nth-child(8) .fill { animation-delay: .4s; }
+.bar-row:nth-child(n+9) .fill { animation-delay: .45s; }
+
+.donut {
+  animation: donutIn .9s cubic-bezier(.22,1,.36,1) both;
+}
+.donut-leg .item {
+  animation: fadeUp .5s ease both;
+}
+.donut-leg .item:nth-child(1) { animation-delay: .15s; }
+.donut-leg .item:nth-child(2) { animation-delay: .25s; }
+.donut-leg .item:nth-child(3) { animation-delay: .35s; }
+.donut-leg .item:nth-child(4) { animation-delay: .45s; }
+.donut-leg .item:nth-child(5) { animation-delay: .55s; }
+
+.stack-track span {
+  transform-origin: left center;
+  animation: barGrowX .8s cubic-bezier(.22,1,.36,1) both;
+}
+
+.vbar {
+  transform-origin: center bottom;
+  animation: barGrowY .9s cubic-bezier(.22,1,.36,1) both;
+}
+.vbar-col:nth-child(1) .vbar { animation-delay: .05s; }
+.vbar-col:nth-child(2) .vbar { animation-delay: .1s; }
+.vbar-col:nth-child(3) .vbar { animation-delay: .15s; }
+.vbar-col:nth-child(4) .vbar { animation-delay: .2s; }
+.vbar-col:nth-child(5) .vbar { animation-delay: .25s; }
+.vbar-col:nth-child(6) .vbar { animation-delay: .3s; }
+.vbar-col:nth-child(7) .vbar { animation-delay: .35s; }
+.vbar-col:nth-child(8) .vbar { animation-delay: .4s; }
+.vbar-col:nth-child(n+9) .vbar { animation-delay: .45s; }
+
+.kpi {
+  animation: fadeUp .55s cubic-bezier(.22,1,.36,1) both;
+}
+.kpi-row .kpi:nth-child(1) { animation-delay: .05s; }
+.kpi-row .kpi:nth-child(2) { animation-delay: .1s; }
+.kpi-row .kpi:nth-child(3) { animation-delay: .15s; }
+.kpi-row .kpi:nth-child(4) { animation-delay: .2s; }
+.kpi-row .kpi:nth-child(5) { animation-delay: .25s; }
+.kpi-row .kpi:nth-child(6) { animation-delay: .3s; }
+
+.panel {
+  animation: fadeUp .5s ease both;
+}
+.line-chart {
+  animation: popIn .7s cubic-bezier(.22,1,.36,1) both;
+}
+.line-chart path {
+  stroke-dasharray: 1200;
+  stroke-dashoffset: 1200;
+  animation: pathDraw 1.4s cubic-bezier(.22,1,.36,1) forwards;
+  animation-delay: .2s;
+}
+.dealer-rank, .funnel-row {
+  animation: fadeUp .55s ease both;
+}
+
+/* Re-play helper: toggling this class restarts animations */
+#main.anim-replay .bar-row .fill,
+#main.anim-replay .donut,
+#main.anim-replay .vbar,
+#main.anim-replay .kpi,
+#main.anim-replay .panel,
+#main.anim-replay .line-chart,
+#main.anim-replay .line-chart path,
+#main.anim-replay .stack-track span {
+  animation: none;
+}
+
 .bar-row .num{width:42px;font-weight:700;color:var(--navy);font-size:12px}
 
 #map-svg-wrap{width:100%;max-width:560px;margin:0 auto}
@@ -1845,6 +1953,7 @@ function showView(v){
           await pullAllFromCloud();
           main.innerHTML=ban+renderAsecDash();
           bindAsecBtns();
+          try { replayChartAnimations(main); } catch(e) {}
         }catch(e){ alert('Falha ao atualizar: '+(e.message||e)); }
         finally{ const b=document.getElementById('btnAsecRefresh'); if(b){b.disabled=false;b.textContent='↻ Atualizar DataBase';} }
       };
@@ -1867,6 +1976,23 @@ function showView(v){
   else if(v==='metro-lista'){ if(!canEdit()){ showView('metro-dash'); return; } main.innerHTML=renderMetroShell(); bindMetro(); }
 
   /* bound above */
+  try { replayChartAnimations(main); } catch(e) {}
+}
+
+function replayChartAnimations(root){
+  if(!root) root = document.getElementById('main');
+  if(!root) return;
+  // force reflow restart of CSS animations on newly injected chart nodes
+  root.classList.remove('anim-replay');
+  void root.offsetWidth;
+  const nodes = root.querySelectorAll('.bar-row .fill, .donut, .vbar, .kpi, .panel, .line-chart, .line-chart path, .stack-track span, .donut-leg .item');
+  nodes.forEach(function(el){
+    el.style.animation = 'none';
+  });
+  void root.offsetWidth;
+  nodes.forEach(function(el){
+    el.style.animation = '';
+  });
 }
 
 /* ===== SGQ DASH ===== */
