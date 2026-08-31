@@ -899,14 +899,42 @@ async function pushFluxoToCloud(row) {
   } catch (e) { console.warn("pushFluxoToCloud", e); }
 }
 
+function normalizeNcUnidade(u) {
+  const s = String(u || '').trim();
+  if (/itaj/i.test(s)) return 'Itajai';   // constraint asec_nc_mes_unidade_check: Matriz | Itajai
+  if (/matriz/i.test(s)) return 'Matriz';
+  return s;
+}
+
+/** Mês no formato do banco asec_nc_mes (nome PT: Janeiro…Dezembro), não ISO */
+function ncMesToDb(mes) {
+  const s = String(mes || '').trim();
+  const MES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  if (MES_PT.includes(s)) return s;
+  const m = s.match(/^(\d{4})-(\d{2})/);
+  if (m) {
+    const ix = parseInt(m[2], 10) - 1;
+    return MES_PT[ix] || s;
+  }
+  // tenta sem acento / case
+  const low = s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  for (const nome of MES_PT) {
+    const n = nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (n === low) return nome;
+  }
+  return s;
+}
+
 async function pushNcToCloud(row) {
   if (typeof canEdit==='function' && !canEdit()) { console.warn('push bloqueado: viewer'); return; }
   if (!sessionStorage.getItem('sgq_access')) return;
   try {
-    const mesIso = dealerMesToIso(row.mes);
+    const unidade = normalizeNcUnidade(row.unidade);
+    const mesDb = ncMesToDb(row.mes);
+    if (!unidade || !mesDb) throw new Error('Unidade e mês são obrigatórios');
     const payload = {
-      unidade: row.unidade,
-      mes: mesIso,
+      unidade: unidade,
+      mes: mesDb,
       nc: row.nc != null ? Number(row.nc) : 0,
       sugestoes: row.sug != null ? Number(row.sug) : 0
     };
@@ -915,7 +943,7 @@ async function pushNcToCloud(row) {
       existing = [{ id: row.id }];
     } else {
       existing = await sbRest('GET', 'asec_nc_mes', {
-        query: 'unidade=eq.' + encodeURIComponent(row.unidade) + '&mes=eq.' + encodeURIComponent(mesIso) + '&select=id'
+        query: 'unidade=eq.' + encodeURIComponent(unidade) + '&mes=eq.' + encodeURIComponent(mesDb) + '&select=id'
       });
     }
     if (existing && existing[0] && existing[0].id) {
@@ -925,8 +953,12 @@ async function pushNcToCloud(row) {
       const ins = await sbRest('POST', 'asec_nc_mes', { body: payload });
       if (ins && ins[0] && ins[0].id) row.id = ins[0].id;
     }
+    // mantém valores canônicos no objeto local
+    row.unidade = unidade;
+    row.mes = mesDb;
   } catch (e) { console.warn('pushNcToCloud', e); throw e; }
 }
+
 
 async function deleteNcFromCloud(rowOrId) {
   if (typeof canEdit==='function' && !canEdit()) { console.warn('delete bloqueado: viewer'); return false; }
@@ -936,12 +968,10 @@ async function deleteNcFromCloud(rowOrId) {
     const row = typeof rowOrId === "object" && rowOrId ? rowOrId : null;
     if (!isCloudUuid(id) && row) {
       let q = "select=id";
-      if (row.unidade) q += "&unidade=eq." + encodeURIComponent(row.unidade);
-      const mesIso =
-        typeof dealerMesToIso === "function"
-          ? dealerMesToIso(row.mes)
-          : row.mes;
-      if (mesIso) q += "&mes=eq." + encodeURIComponent(mesIso);
+      const uni = typeof normalizeNcUnidade === "function" ? normalizeNcUnidade(row.unidade) : row.unidade;
+      const mesDb = typeof ncMesToDb === "function" ? ncMesToDb(row.mes) : row.mes;
+      if (uni) q += "&unidade=eq." + encodeURIComponent(uni);
+      if (mesDb) q += "&mes=eq." + encodeURIComponent(mesDb);
       const existing = await sbRest("GET", "asec_nc_mes", { query: q });
       id = existing && existing[0] && existing[0].id;
     }
