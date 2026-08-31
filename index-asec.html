@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://*.supabase.co; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.supabase.co; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'">
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Checklist Auditoria Interna ASEC - Carmak</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <script src="./supabase.min.js"></script>
 <style>
 :root{
@@ -369,7 +369,7 @@ body.viewer-mode .crono-edit-only{display:none !important}
 </div>
 <div id="questionsContainer"></div>
 <div class="act">
-<button class="btn bp" onclick="generatePDF()">📄 Gerar Relatório PDF</button>
+<button class="btn bp" type="button" id="btnGerarPdf" onclick="generatePDF().catch(function(e){console.error(e);alert('Erro ao gerar PDF: '+(e&&e.message?e.message:e));})">📄 Gerar Relatório PDF</button>
 <button class="btn bg" onclick="saveToHistory()">💾 Salvar no Histórico</button>
 <button class="btn bs" onclick="resetCurrent()">🔄 Limpar Respostas</button>
 </div>
@@ -2214,9 +2214,15 @@ function addFooter(doc, pageNum, totalPages) {
 }
 
 async function generatePDF() {
-  if (!currentArea) return;
+  if (!currentArea) { alert("Abra uma área do checklist antes de gerar o PDF."); return; }
   if (!canAccessArea(currentArea)) { alert("Sem permissão para esta área."); return; }
   if (!readOnly && !validateJustifications()) return;
+
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    alert("Biblioteca de PDF não carregou (jsPDF).\n\nVerifique a conexão ou recarregue a página com Ctrl+F5.\nSe persistir, o bloqueio de segurança (CSP) pode estar impedindo o script.");
+    console.error("window.jspdf ausente", window.jspdf);
+    return;
+  }
 
   const auditor = document.getElementById("auditorName").value.trim() || "Não informado";
   const dealer = document.getElementById("dealerName").value.trim() || "Não informado";
@@ -2338,6 +2344,12 @@ async function generatePDF() {
       nImgs ? nImgs + (nImgs > 1 ? " fotos" : " foto") : "—"
     ]);
   });
+
+  if (typeof doc.autoTable !== "function") {
+    alert("Plugin autoTable do jsPDF não carregou. Recarregue a página (Ctrl+F5).");
+    console.error("doc.autoTable missing");
+    return;
+  }
 
   doc.autoTable({
     startY: y,
