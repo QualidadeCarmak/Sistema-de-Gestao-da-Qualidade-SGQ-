@@ -300,6 +300,33 @@ body.viewer-mode .crono-edit-only{display:none !important}
 
 
 
+
+/* ===== Assinatura no checklist ===== */
+.sig-box{
+  background:var(--c);border:1px solid var(--b);border-radius:12px;
+  padding:1rem 1.15rem;margin:1rem 0 1.25rem;box-shadow:0 1px 3px rgba(0,0,0,.05)
+}
+.sig-box h3{margin:0 0 .35rem;font-size:.95rem;color:var(--p);font-weight:700}
+.sig-box .sig-hint{font-size:.8rem;color:var(--m);margin:0 0 .75rem}
+.sig-canvas-wrap{
+  position:relative;background:#fff;border:1px dashed var(--gold);
+  border-radius:10px;overflow:hidden;touch-action:none
+}
+#sigCanvas{
+  display:block;width:100%;height:140px;cursor:crosshair;
+  touch-action:none;background:#fff
+}
+.sig-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.65rem;align-items:center}
+.sig-actions .btn-sig{
+  padding:.45rem .9rem;border-radius:8px;border:1px solid var(--b);
+  background:#fff;color:var(--p);font-weight:600;font-size:.85rem;cursor:pointer
+}
+.sig-actions .btn-sig:hover{background:#EEF3F8}
+.sig-status{font-size:.8rem;color:var(--m);margin-left:auto}
+.sig-status.ok{color:var(--s);font-weight:700}
+body.readonly-mode #sigCanvas{cursor:not-allowed;opacity:.85}
+body.readonly-mode .sig-actions .btn-sig-clear{display:none}
+
 </style>
 </head>
 <body>
@@ -368,6 +395,19 @@ body.viewer-mode .crono-edit-only{display:none !important}
 <span class="draft-chip" id="draftChip" style="display:none" title="Rascunho local no aparelho">Rascunho</span>
 </div>
 <div id="questionsContainer"></div>
+
+<div class="sig-box" id="sigBox">
+  <h3>Assinatura do auditor</h3>
+  <p class="sig-hint">Desenhe a assinatura abaixo. Ela será incluída automaticamente no PDF ao gerar o relatório — sem precisar assinar em outro aplicativo.</p>
+  <div class="sig-canvas-wrap">
+    <canvas id="sigCanvas" width="700" height="140" aria-label="Área de assinatura"></canvas>
+  </div>
+  <div class="sig-actions">
+    <button type="button" class="btn-sig btn-sig-clear" id="btnSigClear" onclick="clearSignature()">Limpar assinatura</button>
+    <span class="sig-status" id="sigStatus">Aguardando assinatura</span>
+  </div>
+</div>
+
 <div class="act">
 <button class="btn bp" type="button" id="btnGerarPdf" onclick="generatePDF().catch(function(e){console.error(e);alert('Erro ao gerar PDF: '+(e&&e.message?e.message:e));})">📄 Gerar Relatório PDF</button>
 <button class="btn bg" onclick="saveToHistory()">💾 Salvar no Histórico</button>
@@ -1517,6 +1557,8 @@ async function startArea(key) {
 }
 
 function renderQuestions(key) {
+  try { initSignaturePad(); } catch (e) {}
+
   const oldBan = document.getElementById("readonlyBanner"); if (oldBan) oldBan.remove();
 
   const cont = document.getElementById("questionsContainer");
@@ -2213,6 +2255,202 @@ function addFooter(doc, pageNum, totalPages) {
   doc.text(`Página ${pageNum} de ${totalPages}`, pw - 14, ph - 7, { align: "right" });
 }
 
+
+/* ===== Assinatura (canvas) ===== */
+var _sigDrawing = false;
+var _sigHasInk = false;
+var _sigLast = null;
+
+function sigCanvas() {
+  return document.getElementById("sigCanvas");
+}
+
+function sigCtx() {
+  var c = sigCanvas();
+  return c ? c.getContext("2d") : null;
+}
+
+function resizeSigCanvas() {
+  var c = sigCanvas();
+  if (!c) return;
+  var wrap = c.parentElement;
+  var w = Math.max(280, Math.floor((wrap && wrap.clientWidth) || 700));
+  var h = 140;
+  // preserve ink if any
+  var data = null;
+  try {
+    if (_sigHasInk) data = c.toDataURL("image/png");
+  } catch (e) {}
+  c.width = w;
+  c.height = h;
+  var ctx = c.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = "#0C2340";
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  if (data && _sigHasInk) {
+    var img = new Image();
+    img.onload = function () {
+      ctx.drawImage(img, 0, 0, w, h);
+    };
+    img.src = data;
+  }
+}
+
+function updateSigStatus() {
+  var el = document.getElementById("sigStatus");
+  if (!el) return;
+  if (_sigHasInk) {
+    el.textContent = "Assinatura capturada";
+    el.classList.add("ok");
+  } else {
+    el.textContent = "Aguardando assinatura";
+    el.classList.remove("ok");
+  }
+}
+
+function clearSignature() {
+  if (typeof readOnly !== "undefined" && readOnly) return;
+  var c = sigCanvas();
+  var ctx = sigCtx();
+  if (!c || !ctx) return;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, c.width, c.height);
+  _sigHasInk = false;
+  _sigLast = null;
+  updateSigStatus();
+  try { sessionStorage.removeItem("asec_sig_data"); } catch (e) {}
+}
+
+function getSignatureDataURL() {
+  if (!_sigHasInk) return null;
+  var c = sigCanvas();
+  if (!c) return null;
+  try {
+    // trim? keep full canvas for simplicity
+    return c.toDataURL("image/png");
+  } catch (e) {
+    return null;
+  }
+}
+
+function isCanvasBlank(c) {
+  try {
+    var ctx = c.getContext("2d");
+    var d = ctx.getImageData(0, 0, c.width, c.height).data;
+    // look for non-white / non-transparent pixels
+    for (var i = 0; i < d.length; i += 4) {
+      var r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+      if (a > 10 && (r < 250 || g < 250 || b < 250)) return false;
+    }
+  } catch (e) {
+    return !_sigHasInk;
+  }
+  return true;
+}
+
+function sigPointerPos(e, c) {
+  var rect = c.getBoundingClientRect();
+  var clientX, clientY;
+  if (e.touches && e.touches.length) {
+    clientX = e.touches[0].clientX;
+    clientY = e.touches[0].clientY;
+  } else {
+    clientX = e.clientX;
+    clientY = e.clientY;
+  }
+  return {
+    x: (clientX - rect.left) * (c.width / Math.max(1, rect.width)),
+    y: (clientY - rect.top) * (c.height / Math.max(1, rect.height))
+  };
+}
+
+function sigStart(e) {
+  if (typeof readOnly !== "undefined" && readOnly) return;
+  var c = sigCanvas();
+  var ctx = sigCtx();
+  if (!c || !ctx) return;
+  e.preventDefault();
+  _sigDrawing = true;
+  _sigLast = sigPointerPos(e, c);
+  ctx.beginPath();
+  ctx.moveTo(_sigLast.x, _sigLast.y);
+}
+
+function sigMove(e) {
+  if (!_sigDrawing) return;
+  var c = sigCanvas();
+  var ctx = sigCtx();
+  if (!c || !ctx) return;
+  e.preventDefault();
+  var p = sigPointerPos(e, c);
+  ctx.strokeStyle = "#0C2340";
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(_sigLast.x, _sigLast.y);
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+  _sigLast = p;
+  _sigHasInk = true;
+  updateSigStatus();
+}
+
+function sigEnd(e) {
+  if (!_sigDrawing) return;
+  _sigDrawing = false;
+  _sigLast = null;
+  if (_sigHasInk) {
+    try {
+      sessionStorage.setItem("asec_sig_data", getSignatureDataURL() || "");
+    } catch (err) {}
+  }
+}
+
+function initSignaturePad() {
+  var c = sigCanvas();
+  if (!c || c._sigBound) return;
+  c._sigBound = true;
+  resizeSigCanvas();
+  // mouse
+  c.addEventListener("mousedown", sigStart);
+  c.addEventListener("mousemove", sigMove);
+  window.addEventListener("mouseup", sigEnd);
+  // touch
+  c.addEventListener("touchstart", sigStart, { passive: false });
+  c.addEventListener("touchmove", sigMove, { passive: false });
+  c.addEventListener("touchend", sigEnd);
+  c.addEventListener("touchcancel", sigEnd);
+  window.addEventListener("resize", function () {
+    resizeSigCanvas();
+  });
+  // restore
+  try {
+    var saved = sessionStorage.getItem("asec_sig_data");
+    if (saved && saved.indexOf("data:image") === 0) {
+      var ctx = sigCtx();
+      var img = new Image();
+      img.onload = function () {
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        _sigHasInk = true;
+        updateSigStatus();
+      };
+      img.src = saved;
+    }
+  } catch (e) {}
+  updateSigStatus();
+}
+
+// init when DOM ready
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initSignaturePad);
+} else {
+  setTimeout(initSignaturePad, 0);
+}
+
 async function generatePDF() {
   if (!currentArea) { alert("Abra uma área do checklist antes de gerar o PDF."); return; }
   if (!canAccessArea(currentArea)) { alert("Sem permissão para esta área."); return; }
@@ -2222,6 +2460,11 @@ async function generatePDF() {
     alert("Biblioteca de PDF não carregou (jsPDF).\n\nVerifique a conexão ou recarregue a página com Ctrl+F5.\nSe persistir, o bloqueio de segurança (CSP) pode estar impedindo o script.");
     console.error("window.jspdf ausente", window.jspdf);
     return;
+  }
+
+  if (typeof getSignatureDataURL === "function" && !getSignatureDataURL()) {
+    var go = confirm("Nenhuma assinatura foi desenhada no checklist.\n\nDeseja gerar o PDF mesmo assim?");
+    if (!go) return;
   }
 
   const auditor = document.getElementById("auditorName").value.trim() || "Não informado";
@@ -2438,6 +2681,23 @@ async function generatePDF() {
   doc.setFontSize(7.5);
   doc.setTextColor(140, 145, 155);
   doc.text("Assinatura", m + 128, y + 25);
+
+  // Assinatura capturada no checklist
+  try {
+    var sigData = (typeof getSignatureDataURL === "function") ? getSignatureDataURL() : null;
+    if (sigData) {
+      var sigW = 55, sigH = 22;
+      var sigX = m + 108;
+      var sigY = y + 2;
+      doc.addImage(sigData, "PNG", sigX, sigY, sigW, sigH);
+    } else {
+      doc.setFontSize(7);
+      doc.setTextColor(180, 100, 100);
+      doc.text("(sem assinatura digital no checklist)", m + 102, y + 16);
+    }
+  } catch (sigErr) {
+    console.warn("Falha ao embutir assinatura no PDF", sigErr);
+  }
 
   // ===== EVIDÊNCIAS (recomprimidas para PDF leve) =====
   const evs = [];
