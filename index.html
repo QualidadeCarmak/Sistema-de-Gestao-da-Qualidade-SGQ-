@@ -468,6 +468,38 @@ tr:hover td{background:var(--tint)}
 .sync-status.warn{color:#E0C56A}
 .sync-status.err{color:#ffb4bc}
 
+
+/* Calendário treinamentos */
+.cal-legend{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.cal-ev-tag{display:inline-block;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;letter-spacing:.02em}
+.cal-online{--calc:#1B4F72;background:#D6EAF8;color:#1B4F72}
+.cal-pratica{--calc:#0E6655;background:#D5F5E3;color:#0E6655}
+.cal-pres{--calc:#6C3483;background:#E8DAEF;color:#6C3483}
+.cal-tos{--calc:#7D6608;background:#FCF3CF;color:#7D6608}
+.cal-skill{--calc:#922B21;background:#F5B7B1;color:#922B21}
+.cal-outros{background:#EAECEE;color:#566573}
+.cal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.cal-month{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.cal-month.is-current{border-color:var(--gold);box-shadow:0 0 0 2px rgba(196,163,90,.35)}
+.cal-month-h{padding:10px 12px;font-family:Space Grotesk,sans-serif;font-weight:700;font-size:14px;background:linear-gradient(135deg,var(--navy),var(--navy-2));color:#fff;display:flex;align-items:center;gap:8px}
+.cal-badge-now{font-size:10px;background:var(--gold);color:var(--navy);padding:2px 7px;border-radius:999px;font-weight:800}
+.cal-month-body{padding:10px;display:flex;flex-direction:column;gap:8px;min-height:80px}
+.cal-ev{border-radius:10px;padding:8px 10px;border-left:4px solid currentColor;background:var(--tint,#f3f3f3)}
+.cal-ev.cal-online{border-left-color:#1B4F72;background:#EBF5FB}
+.cal-ev.cal-pratica{border-left-color:#0E6655;background:#E8F8F5}
+.cal-ev.cal-pres{border-left-color:#6C3483;background:#F5EEF8}
+.cal-ev.cal-tos{border-left-color:#7D6608;background:#FEF9E7}
+.cal-ev.cal-skill{border-left-color:#922B21;background:#FDEDEC}
+.cal-ev.past{opacity:.55}
+.cal-ev.now{box-shadow:0 0 0 2px var(--gold)}
+.cal-ev-top{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:4px}
+.cal-ev-dias{font-size:11px;font-weight:800;color:var(--ink)}
+.cal-ev-tit{font-size:12px;font-weight:600;line-height:1.35;color:var(--ink)}
+.cal-empty{font-size:12px;color:var(--muted);margin:0}
+.cal-up{display:flex;flex-direction:column;gap:6px}
+.cal-up-item{font-size:13px;padding:8px 10px;border-radius:8px;background:var(--tint)}
+.cal-up-item b{font-weight:800}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1960,6 +1992,144 @@ document.getElementById('acctPhoto').addEventListener('change',function(ev){
 });
 
 /* HUB / SIDE */
+
+/* ===== Calendário oficial TOYOTA TMHM 2026/2027 (programação on-line / prática) ===== */
+const TRAIN_CALENDAR = [
+  {ano:2026, mes:3, mesLabel:'Abril 2026', eventos:[
+    {ini:6,fim:10, titulo:'TO/BT STEP 1 · Mód. 1', tipo:'online'},
+    {ini:13,fim:17, titulo:'TO/BT STEP 1 · Mód. 2', tipo:'online'}
+  ]},
+  {ano:2026, mes:4, mesLabel:'Maio 2026', eventos:[
+    {ini:4,fim:7, titulo:'TO/BT STEP 1 · Mód. 3', tipo:'pratica'},
+    {ini:11,fim:15, titulo:'TO STEP 2 · Mód. 1', tipo:'online'},
+    {ini:18,fim:22, titulo:'TO STEP 2 · Mód. 2', tipo:'online'},
+    {ini:25,fim:28, titulo:'STEP 1 e 2 BT · Presencial BRF', tipo:'presencial'}
+  ]},
+  {ano:2026, mes:5, mesLabel:'Junho 2026', eventos:[
+    {ini:8,fim:12, titulo:'TO STEP 2 · Mód. 3', tipo:'pratica'},
+    {ini:15,fim:19, titulo:'STEP 2 BT', tipo:'online'},
+    {ini:29,fim:30, titulo:'TOS · Toyota Operação Segura', tipo:'tos'}
+  ]},
+  {ano:2026, mes:6, mesLabel:'Julho 2026', eventos:[
+    {ini:6,fim:8, titulo:'STEP 2 BT', tipo:'pratica'},
+    {ini:13,fim:17, titulo:'TO STEP 3 · Mód. 1', tipo:'online'},
+    {ini:20,fim:24, titulo:'TO STEP 3 · Mód. 2', tipo:'online'},
+    {ini:27,fim:30, titulo:'TO/BT STEP 1 · Mód. 3', tipo:'pratica'}
+  ]},
+  {ano:2026, mes:7, mesLabel:'Agosto 2026', eventos:[
+    {ini:3,fim:7, titulo:'TO STEP 3 · Mód. 3', tipo:'pratica'},
+    {ini:10,fim:12, titulo:'STEP 2 BT · Prática CPS', tipo:'pratica'},
+    {ini:10,fim:14, titulo:'TO STEP 2 · Mód. 3', tipo:'pratica'},
+    {ini:24,fim:26, titulo:'STEP 2 BT', tipo:'pratica'},
+    {ini:27,fim:28, titulo:'TOS · Toyota Operação Segura', tipo:'tos'}
+  ]},
+  {ano:2026, mes:8, mesLabel:'Setembro 2026', eventos:[
+    {ini:8,fim:11, titulo:'Turma programada (TMHM)', tipo:'pratica'},
+    {ini:14,fim:18, titulo:'Turma programada (TMHM)', tipo:'online'},
+    {ini:21,fim:25, titulo:'Turma programada (TMHM)', tipo:'pratica'}
+  ]},
+  {ano:2026, mes:9, mesLabel:'Outubro 2026', eventos:[
+    {ini:1,fim:1, titulo:'Skill Contest TMHM/Dealers · 1ª fase', tipo:'skill'},
+    {ini:5,fim:9, titulo:'TO STEP 3 · Mód. 3', tipo:'pratica'},
+    {ini:6,fim:9, titulo:'TTS · 3ª turma · 2ª semana', tipo:'presencial'},
+    {ini:19,fim:23, titulo:'TO/BT STEP 1 · Mód. 1', tipo:'online'},
+    {ini:26,fim:30, titulo:'TO/BT STEP 1 · Mód. 2', tipo:'online'},
+    {ini:29,fim:30, titulo:'TOS · Toyota Operação Segura', tipo:'tos'}
+  ]},
+  {ano:2026, mes:10, mesLabel:'Novembro 2026', eventos:[
+    {ini:3,fim:6, titulo:'TO/BT STEP 1 · Mód. 3', tipo:'pratica'},
+    {ini:11,fim:11, titulo:'Skill Contest · 2ª fase', tipo:'skill'},
+    {ini:12,fim:12, titulo:'Skill Contest · 3ª fase', tipo:'skill'},
+    {ini:23,fim:27, titulo:'STEP 2 BT', tipo:'online'}
+  ]},
+  {ano:2026, mes:11, mesLabel:'Dezembro 2026', eventos:[
+    {ini:1,fim:4, titulo:'Turma programada (TMHM)', tipo:'pratica'},
+    {ini:7,fim:11, titulo:'Turma programada (TMHM)', tipo:'online'},
+    {ini:14,fim:18, titulo:'Turma programada (TMHM)', tipo:'pratica'}
+  ]},
+  {ano:2027, mes:0, mesLabel:'Janeiro 2027', eventos:[
+    {ini:4,fim:9, titulo:'TO STEP 2 · Mód. 3', tipo:'pratica'},
+    {ini:11,fim:15, titulo:'TO STEP 3 · Mód. 1', tipo:'online'},
+    {ini:18,fim:22, titulo:'TO STEP 3 · Mód. 2', tipo:'online'},
+    {ini:25,fim:28, titulo:'TO/BT STEP 1 · Mód. 3', tipo:'pratica'}
+  ]},
+  {ano:2027, mes:1, mesLabel:'Fevereiro 2027', eventos:[
+    {ini:1,fim:3, titulo:'STEP 2 BT', tipo:'pratica'},
+    {ini:15,fim:19, titulo:'TO STEP 3 · Mód. 3', tipo:'pratica'},
+    {ini:22,fim:25, titulo:'TO/BT STEP 1 · Mód. 3', tipo:'pratica'}
+  ]},
+  {ano:2027, mes:2, mesLabel:'Março 2027', eventos:[
+    {ini:1,fim:3, titulo:'STEP 2 BT', tipo:'pratica'},
+    {ini:8,fim:11, titulo:'TO/BT STEP 1 · Mód. 3', tipo:'pratica'},
+    {ini:15,fim:19, titulo:'TO STEP 2 · Mód. 3', tipo:'pratica'},
+    {ini:22,fim:25, titulo:'TO STEP 3 · Mód. 3', tipo:'pratica'}
+  ]}
+];
+
+function trainCalTipoMeta(t){
+  if(t==='online') return {label:'On-line', cls:'cal-online'};
+  if(t==='pratica') return {label:'Prática', cls:'cal-pratica'};
+  if(t==='presencial') return {label:'Presencial', cls:'cal-pres'};
+  if(t==='tos') return {label:'TOS', cls:'cal-tos'};
+  if(t==='skill') return {label:'Skill Contest', cls:'cal-skill'};
+  return {label:t||'—', cls:'cal-outros'};
+}
+
+function renderTreinCalendario(){
+  const hoje=new Date(); hoje.setHours(12,0,0,0);
+  const months=TRAIN_CALENDAR.map(m=>{
+    const isCur = (hoje.getFullYear()===m.ano && hoje.getMonth()===m.mes);
+    const evs=m.eventos.map(ev=>{
+      const meta=trainCalTipoMeta(ev.tipo);
+      const start=new Date(m.ano, m.mes, ev.ini, 12);
+      const end=new Date(m.ano, m.mes, ev.fim, 12);
+      let state='';
+      if(end < hoje) state='past';
+      else if(start <= hoje && hoje <= end) state='now';
+      else state='future';
+      const dias = ev.ini===ev.fim ? ('Dia '+String(ev.ini).padStart(2,'0')) : ('Dia '+String(ev.ini).padStart(2,'0')+' a '+String(ev.fim).padStart(2,'0'));
+      return `<div class="cal-ev ${meta.cls} ${state}">
+        <div class="cal-ev-top"><span class="cal-ev-dias">${dias}</span><span class="cal-ev-tag">${meta.label}</span></div>
+        <div class="cal-ev-tit">${esc(ev.titulo)}</div>
+      </div>`;
+    }).join('');
+    return `<div class="cal-month ${isCur?'is-current':''}">
+      <div class="cal-month-h">${esc(m.mesLabel)}${isCur?' <span class="cal-badge-now">mês atual</span>':''}</div>
+      <div class="cal-month-body">${evs||'<p class="cal-empty">Sem turmas listadas</p>'}</div>
+    </div>`;
+  }).join('');
+
+  // próximos 3 eventos a partir de hoje
+  const flat=[];
+  TRAIN_CALENDAR.forEach(m=>{
+    m.eventos.forEach(ev=>{
+      flat.push({...ev, ano:m.ano, mes:m.mes, mesLabel:m.mesLabel, start:new Date(m.ano,m.mes,ev.ini,12), end:new Date(m.ano,m.mes,ev.fim,12)});
+    });
+  });
+  const upcoming=flat.filter(e=>e.end>=hoje).sort((a,b)=>a.start-b.start).slice(0,5);
+  const upHtml=upcoming.map(e=>{
+    const meta=trainCalTipoMeta(e.tipo);
+    const dias=e.ini===e.fim?String(e.ini).padStart(2,'0'):(String(e.ini).padStart(2,'0')+'–'+String(e.fim).padStart(2,'0'));
+    return `<div class="cal-up-item ${meta.cls}"><b>${esc(e.mesLabel.split(' ')[0])} ${dias}</b> · ${esc(e.titulo)} <span class="cal-ev-tag">${meta.label}</span></div>`;
+  }).join('')||'<p class="cal-empty">Nenhum evento futuro na programação.</p>';
+
+  return `<div class="page-h"><h1>Calendário TO/BT 2026–2027</h1>
+    <p>Programação oficial de turmas on-line e práticas (TMHM). Use as cores para identificar o tipo de módulo.</p></div>
+  <div class="cal-legend">
+    <span class="cal-ev-tag cal-online">On-line</span>
+    <span class="cal-ev-tag cal-pratica">Prática</span>
+    <span class="cal-ev-tag cal-pres">Presencial</span>
+    <span class="cal-ev-tag cal-tos">TOS</span>
+    <span class="cal-ev-tag cal-skill">Skill Contest</span>
+  </div>
+  <div class="panel" style="margin-bottom:14px">
+    <h3 style="margin:0 0 8px">Próximas turmas</h3>
+    <div class="cal-up">${upHtml}</div>
+  </div>
+  <div class="cal-grid">${months}</div>
+  <p style="font-size:11px;color:var(--muted);margin-top:12px">Legenda de locais (quando aplicável): AN Artur Nogueira-SP · CPS Campinas-SP · SJP São José dos Pinhais-PR · BRF unidade BRF. Fonte: calendário TMHM 26/27.</p>`;
+}
+
 const HUBS={
   sgq:{label:'SGQ · Documentos', icon:'📄', items:[
     {id:'sgq-dash',label:'Dashboard',icon:'▣'},
@@ -1968,7 +2138,8 @@ const HUBS={
   ]},
   trein:{label:'Treinamentos TO/BT', icon:'🎓', items:[
     {id:'trein-dash',label:'Dashboard',icon:'▣'},
-    {id:'trein-lista',label:'Técnicos',icon:'◎'}
+    {id:'trein-lista',label:'Técnicos',icon:'◎'},
+    {id:'trein-cal',label:'Calendário 26/27',icon:'📅'}
   ]},
   asec:{label:'ASEC Toyota', icon:'☑', items:[
     {id:'asec-dash',label:'Dashboard',icon:'▣'},
@@ -1984,7 +2155,7 @@ const HUBS={
 
 function hubItems(h){
   const all=(HUBS[h]&&HUBS[h].items)||[];
-  if(isViewer()) return all.filter(it=>/-dash$/.test(it.id));
+  if(isViewer()) return all.filter(it=>/-dash$/.test(it.id) || it.id==='trein-cal' || it.id==='asec-checklist');
   return all;
 }
 async function enterHub(h){
@@ -2066,6 +2237,7 @@ function showView(v){
   else if(v==='sgq-flux'){ if(!canEdit()){ showView('sgq-dash'); return; } main.innerHTML=renderFluxShell(); bindFlux(); }
   else if(v==='trein-dash'){ main.innerHTML=ban+renderTreinDash(); setTimeout(function(){ bindPdfButton('btnRelTreinoPdf', gerarRelatorioTreinoPdf); },40); }
   else if(v==='trein-lista'){ if(!canEdit()){ showView('trein-dash'); return; } main.innerHTML=renderTreinShell(); bindTrein(); }
+  else if(v==='trein-cal'){ main.innerHTML=ban+renderTreinCalendario(); }
   else if(v==='asec-dash'){
     main.innerHTML=ban+renderAsecDash();
     const bindAsecBtns=()=>{
@@ -2196,7 +2368,60 @@ function themePdfColors(){
 }
 function hexToRgb(hex){hex=String(hex||"").replace("#","");if(hex.length===3)hex=hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];const n=parseInt(hex,16);return isNaN(n)?[6,64,43]:[(n>>16)&255,(n>>8)&255,n&255];}
 function pdfEnsureLibs(){const j=window.jspdf;if(!j||!j.jsPDF){alert("Biblioteca PDF não carregou. Ctrl+F5.");return null;}return j.jsPDF;}
-function pdfMesRef(){const d=new Date(),M=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];return{d,mes:M[d.getMonth()],ano:d.getFullYear(),label:M[d.getMonth()]+"/"+d.getFullYear(),ym:d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")};}
+function pdfMesRef(opt){
+  const M=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  let y, mo;
+  if(opt && opt.ano && opt.mesIdx!=null){ y=Number(opt.ano); mo=Number(opt.mesIdx); }
+  else if(window._pdfRef && window._pdfRef.ano!=null && window._pdfRef.mesIdx!=null){ y=Number(window._pdfRef.ano); mo=Number(window._pdfRef.mesIdx); }
+  else {
+    /* padrão: mês ANTERIOR ao corrente (relatório do mês que fechou) */
+    const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1);
+    y=d.getFullYear(); mo=d.getMonth();
+  }
+  if(mo<0){ mo=11; y--; }
+  if(mo>11){ mo=0; y++; }
+  return {d:new Date(y,mo,1), mes:M[mo], ano:y, mesIdx:mo, label:M[mo]+"/"+y, ym:y+"-"+String(mo+1).padStart(2,"0")};
+}
+/** Pergunta o mês de referência do relatório (padrão = mês anterior). Retorna Promise<ref|null> se cancelar. */
+function askPdfMesRef(){
+  return new Promise(resolve=>{
+    const M=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+    const now=new Date();
+    const def=new Date(now.getFullYear(), now.getMonth()-1, 1);
+    const years=[def.getFullYear()-1, def.getFullYear(), def.getFullYear()+1];
+    const bg=document.createElement('div');
+    bg.className='modal-bg on';
+    bg.style.zIndex='6000';
+    bg.innerHTML=`<div class="modal-box" style="max-width:380px">
+      <div class="modal-head"><h2>Mês de referência do relatório</h2></div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--muted);margin:0 0 12px">Os números vêm da base atual (dados atualizados). O mês só define o título e o nome do arquivo (ex.: relatório de agosto).</p>
+        <div class="fg"><label>Mês</label>
+          <select id="_pdfMesSel">${M.map((m,i)=>`<option value="${i}" ${i===def.getMonth()?'selected':''}>${m}</option>`).join('')}</select>
+        </div>
+        <div class="fg"><label>Ano</label>
+          <select id="_pdfAnoSel">${years.map(y=>`<option value="${y}" ${y===def.getFullYear()?'selected':''}>${y}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-s" id="_pdfMesCancel">Cancelar</button>
+        <button type="button" class="btn btn-g" id="_pdfMesOk">Gerar PDF</button>
+      </div>
+    </div>`;
+    document.body.appendChild(bg);
+    const finish=(val)=>{ try{bg.remove();}catch(e){} resolve(val); };
+    bg.querySelector('#_pdfMesCancel').onclick=()=>finish(null);
+    bg.querySelector('#_pdfMesOk').onclick=()=>{
+      const mesIdx=Number(bg.querySelector('#_pdfMesSel').value);
+      const ano=Number(bg.querySelector('#_pdfAnoSel').value);
+      const ref=pdfMesRef({ano, mesIdx});
+      window._pdfRef=ref;
+      finish(ref);
+    };
+    bg.addEventListener('click',e=>{ if(e.target===bg) finish(null); });
+  });
+}
+
 function pdfQuem(){return(sessionStorage.getItem("sgq_email")||"Qualidade").split("@")[0];}
 
 function pdfHeader(doc,titulo,colors){
@@ -2349,18 +2574,34 @@ function pdfStackedBars(doc,y,rows,colors){
   return y+2;
 }
 function daysFromToday(iso){if(!iso)return null;const d=new Date(String(iso).slice(0,10)+"T12:00:00");if(isNaN(d))return null;const n=new Date();n.setHours(12,0,0,0);return Math.round((d-n)/86400000);}
-function bindPdfButton(id,fn){const b=document.getElementById(id);if(!b)return;b.onclick=()=>Promise.resolve(fn()).catch(e=>{console.error(e);alert("Erro ao gerar PDF: "+(e.message||e));});}
+function bindPdfButton(id,fn){
+  const b=document.getElementById(id);if(!b)return;
+  b.onclick=async()=>{
+    try{
+      const ref=await askPdfMesRef();
+      if(!ref) return;
+      /* opcional: re-sincroniza base antes de emitir */
+      if(sessionStorage.getItem('sgq_access') && typeof pullAllFromCloud==='function'){
+        try{ b.disabled=true; b.textContent='Atualizando dados…'; await pullAllFromCloud(); }catch(e){ console.warn('sync pre-pdf',e); }
+        finally{ b.disabled=false; const t=b.getAttribute('data-label')||'Gerar relatório PDF'; b.textContent=t; }
+      }
+      await Promise.resolve(fn(ref));
+    }catch(e){ console.error(e); alert("Erro ao gerar PDF: "+(e.message||e)); }
+  };
+  if(b && !b.getAttribute('data-label')) b.setAttribute('data-label', b.textContent||'Gerar relatório PDF');
+}
 
 /* ---------- SGQ (como dashboard: KPIs + hBar área + donut tipo + flux) ---------- */
-async function gerarRelatorioSgqPdf(){
-  const JS=pdfEnsureLibs();if(!JS)return;const colors=themePdfColors(),doc=new JS({orientation:"portrait",unit:"mm",format:"a4"}),ref=pdfMesRef();
+async function gerarRelatorioSgqPdf(refOpt){
+  const JS=pdfEnsureLibs();if(!JS)return;const colors=themePdfColors(),doc=new JS({orientation:"portrait",unit:"mm",format:"a4"}),ref=refOpt||pdfMesRef();
   pdfHeader(doc,"Relatório mensal — SGQ / Controle documental",colors);
   const docs=(DB.docs||[]).map(enrichDoc),flux=DB.fluxos||[];
-  const ativos=docs.filter(d=>!/obsoleto|cancelado/i.test(String(d.situacao||"")));
-  const nVenc=docs.filter(d=>d.st==="Vencido"||(daysFromToday(d.revisao)!=null&&daysFromToday(d.revisao)<0)).length;
-  const n30=docs.filter(d=>{const x=daysFromToday(d.revisao);return x!=null&&x>=0&&x<=30;}).length;
-  const n90=docs.filter(d=>{const x=daysFromToday(d.revisao);return x!=null&&x>30&&x<=90;}).length;
-  const obsoletos=docs.filter(d=>/obsoleto/i.test(String(d.situacao||""))).length;
+  /* Mesma regra do dashboard: statusDoc via enrichDoc; não soma obsoleto/cancelado como vencido */
+  const ativos=docs.filter(d=>!/obsoleto|cancelado/i.test(String(d.situacao||"")) && d.st!=="Obsoleto" && d.st!=="Cancelado");
+  const nVenc=docs.filter(d=>d.st==="Vencido").length;
+  const n30=docs.filter(d=>d.st==="Vence em 30 dias").length;
+  const n90=docs.filter(d=>d.st==="Vence em 90 dias").length;
+  const obsoletos=docs.filter(d=>/obsoleto/i.test(String(d.situacao||"")) || d.st==="Obsoleto").length;
   const emDia=docs.filter(d=>d.st==="Em dia").length;
   const ativosComPrazo=ativos.filter(d=>d.st&&d.st!=="Sem data");
   const confOk=ativosComPrazo.filter(d=>d.st==="Em dia").length;
@@ -2417,8 +2658,8 @@ async function gerarRelatorioSgqPdf(){
 }
 
 /* ---------- TREINO (KPIs STEP + barras empilhadas + funil + UF) ---------- */
-async function gerarRelatorioTreinoPdf(){
-  const JS=pdfEnsureLibs();if(!JS)return;const colors=themePdfColors(),doc=new JS({orientation:"portrait",unit:"mm",format:"a4"}),ref=pdfMesRef();
+async function gerarRelatorioTreinoPdf(refOpt){
+  const JS=pdfEnsureLibs();if(!JS)return;const colors=themePdfColors(),doc=new JS({orientation:"portrait",unit:"mm",format:"a4"}),ref=refOpt||pdfMesRef();
   pdfHeader(doc,"Relatório mensal — Capacitação / Técnicos",colors);
   const people=DB.people||[],n=people.length||1;
   let s1=0,s2=0,s3=0,aptosN=0;
@@ -2548,8 +2789,8 @@ async function pdfBrazilMapFromDash(doc, y, colors){
 
 
 /* ---------- ASEC ---------- */
-async function gerarRelatorioAsecPdf(){
-  const JS=pdfEnsureLibs();if(!JS)return;const colors=themePdfColors(),doc=new JS({orientation:"portrait",unit:"mm",format:"a4"}),ref=pdfMesRef();
+async function gerarRelatorioAsecPdf(refOpt){
+  const JS=pdfEnsureLibs();if(!JS)return;const colors=themePdfColors(),doc=new JS({orientation:"portrait",unit:"mm",format:"a4"}),ref=refOpt||pdfMesRef();
   pdfHeader(doc,"Relatório mensal — ASEC (gerencial)",colors);
   const asec=DB.asec||{};
   const aud=asec.auditorias||[];
@@ -2692,8 +2933,8 @@ async function gerarRelatorioAsecPdf(){
 
 
 /* ---------- METROLOGIA (KPIs + barras verticais como no dash) ---------- */
-async function gerarRelatorioMetroPdf(){
-  const JS=pdfEnsureLibs();if(!JS)return;const colors=themePdfColors(),doc=new JS({orientation:"portrait",unit:"mm",format:"a4"}),ref=pdfMesRef();
+async function gerarRelatorioMetroPdf(refOpt){
+  const JS=pdfEnsureLibs();if(!JS)return;const colors=themePdfColors(),doc=new JS({orientation:"portrait",unit:"mm",format:"a4"}),ref=refOpt||pdfMesRef();
   pdfHeader(doc,"Relatório mensal — Metrologia (ISO 9001 · 7.1.5)",colors);
   const all=(DB.instruments||[]).map(i=>typeof enrichInst==="function"?enrichInst(i):i);
   // use same status logic as enrichInst/st if available
