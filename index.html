@@ -116,7 +116,23 @@ body.viewer-mode .btn-d,
 body.viewer-mode #themeGrid,
 body.viewer-mode .sp-sec:has(#themeGrid),
 body.viewer-mode [data-ed],
-body.viewer-mode [data-del]{display:none!important}
+body.viewer-mode [data-del],
+body.viewer-mode button[data-ed],
+body.viewer-mode button[data-del],
+body.viewer-mode #btnNewDoc,
+body.viewer-mode #btnNewFlux,
+body.viewer-mode #btnNewTr,
+body.viewer-mode #btnNewMt,
+body.viewer-mode #btnNewDealer,
+body.viewer-mode #btnNewNc,
+body.viewer-mode [id^="btnNew"],
+body.viewer-mode .btn-d,
+body.viewer-mode .btn-del,
+body.viewer-mode .toolbar .btn-g{
+  display:none!important;
+}
+body.viewer-mode .table-wrap td:last-child button{display:none!important}
+
 .viewer-banner{background:#eef6ff;border:1px solid #b6d4fe;color:#0b3d91;padding:.55rem 1rem;border-radius:10px;margin-bottom:12px;font-size:.85rem;font-weight:600}
 .guia-card h3{font-family:Space Grotesk,sans-serif;font-size:18px;margin:0 0 6px}
 .guia-card p{font-size:13px;opacity:.78;line-height:1.45;margin:0}
@@ -1582,7 +1598,11 @@ function bindNotifications(){
 }
 
 function displayUserLabel(){
-  if(isViewer()) return 'Visualização';
+  if(isViewer()){
+    const em=(sessionStorage.getItem('sgq_email')||'').toLowerCase();
+    if(em.indexOf('colab@')>=0) return 'Colaboração · somente leitura';
+    return 'Visualização · somente leitura';
+  }
   const named = (sessionStorage.getItem('sgq_name')||'').trim();
   if(named) return named;
   const em = (sessionStorage.getItem('sgq_email')||'').toLowerCase();
@@ -1630,15 +1650,16 @@ async function loadSgqProfile(userId, email){
   }catch(e){ console.warn('loadSgqProfile', e); }
 
   let role = null;
-  if(profile && profile.role){
+  /* colab SEMPRE viewer no SGQ — nunca master, mesmo se role no profile estiver errado */
+  if(em === 'colab@carmak.com.br' || em.indexOf('colab@')===0){
+    role = 'viewer';
+  } else if(profile && profile.role){
     const r = String(profile.role).toLowerCase();
     if(r==='viewer' || r==='visualizador') role = 'viewer';
     else if(r==='master' || r==='admin' || r==='qualidade') role = 'master';
     else role = r;
   } else {
-    /* fallback por e-mail se profile ausente */
-    if(em === 'colab@carmak.com.br' || em.indexOf('colab@')>=0) role = 'viewer';
-    else if(em === 'calidadecarmak@gmail.com' || /qualidade/i.test(em)) role = 'master';
+    if(em === 'calidadecarmak@gmail.com' || /qualidade/i.test(em)) role = 'master';
   }
 
   const area = profile && profile.area ? String(profile.area).trim() : '';
@@ -2155,7 +2176,7 @@ const HUBS={
 
 function hubItems(h){
   const all=(HUBS[h]&&HUBS[h].items)||[];
-  if(isViewer()) return all.filter(it=>/-dash$/.test(it.id) || it.id==='trein-cal' || it.id==='asec-checklist');
+  /* Viewer (colab): vê todos os menus; edição bloqueada via canEdit/CSS */
   return all;
 }
 async function enterHub(h){
@@ -2224,19 +2245,16 @@ function bindAreaChartClicks(){
 }
 
 function showView(v){
-  if(isViewer() && v && !/-dash$/.test(v)){
-    const map={ 'sgq-docs':'sgq-dash','sgq-flux':'sgq-dash','trein-lista':'trein-dash','asec-checklist':'asec-dash','asec-dealer':'asec-dash','asec-nc':'asec-dash','metro-lista':'metro-dash' };
-    v = map[v] || (hub ? hub+'-dash' : 'sgq-dash');
-  }
+  /* Viewer pode abrir todas as abas (somente leitura). Edição bloqueada em canEdit() + CSS. */
   view=v;
   document.querySelectorAll('#sideItems button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   const main=document.getElementById('main');
   const ban = isViewer() ? `<div class="viewer-banner">Modo visualização — somente dashboards. Sem permissão de edição.</div>` : '';
   if(v==='sgq-dash'){ main.innerHTML=ban+renderSgqDash(); setTimeout(function(){ try{bindAreaChartClicks();}catch(e){} bindPdfButton('btnRelSgqPdf', gerarRelatorioSgqPdf); },40); }
-  else if(v==='sgq-docs'){ if(!canEdit()){ showView('sgq-dash'); return; } main.innerHTML=renderDocsShell(); bindDocs(); }
-  else if(v==='sgq-flux'){ if(!canEdit()){ showView('sgq-dash'); return; } main.innerHTML=renderFluxShell(); bindFlux(); }
+  else if(v==='sgq-docs'){ main.innerHTML=(isViewer()?`<div class="viewer-banner">Modo visualização — consulta da Lista Mestra. Sem permissão de edição.</div>`:'')+renderDocsShell(); bindDocs(); }
+  else if(v==='sgq-flux'){ main.innerHTML=(isViewer()?`<div class="viewer-banner">Modo visualização — consulta de fluxogramas. Sem permissão de edição.</div>`:'')+renderFluxShell(); bindFlux(); }
   else if(v==='trein-dash'){ main.innerHTML=ban+renderTreinDash(); setTimeout(function(){ bindPdfButton('btnRelTreinoPdf', gerarRelatorioTreinoPdf); },40); }
-  else if(v==='trein-lista'){ if(!canEdit()){ showView('trein-dash'); return; } main.innerHTML=renderTreinShell(); bindTrein(); }
+  else if(v==='trein-lista'){ main.innerHTML=(isViewer()?`<div class="viewer-banner">Modo visualização — consulta de técnicos. Sem permissão de edição.</div>`:'')+renderTreinShell(); bindTrein(); }
   else if(v==='trein-cal'){ main.innerHTML=ban+renderTreinCalendario(); }
   else if(v==='asec-dash'){
     main.innerHTML=ban+renderAsecDash();
@@ -2266,10 +2284,10 @@ function showView(v){
         <p style="margin-top:1rem;font-size:12px;color:var(--muted)">Dica: deixe as duas abas abertas. Ao salvar um relatório ou incluir data no cronograma, volte aqui e recarregue o Dashboard ASEC (ou faça logout/login) para atualizar os números.</p>
       </div>`;
   }
-  else if(v==='asec-nc'){ if(!canEdit()){ showView('asec-dash'); return; } main.innerHTML=renderNcShell(); bindNc(); }
-  else if(v==='asec-dealer'){ if(!canEdit()){ showView('asec-dash'); return; } main.innerHTML=renderDealerShell(); bindDealer(); }
+  else if(v==='asec-nc'){ main.innerHTML=(isViewer()?`<div class="viewer-banner">Modo visualização — consulta NC × Sugestões. Sem permissão de edição.</div>`:'')+renderNcShell(); bindNc(); }
+  else if(v==='asec-dealer'){ main.innerHTML=(isViewer()?`<div class="viewer-banner">Modo visualização — consulta Dealer Evaluation. Sem permissão de edição.</div>`:'')+renderDealerShell(); bindDealer(); }
   else if(v==='metro-dash'){ main.innerHTML=ban+renderMetroDash(); setTimeout(function(){ bindPdfButton('btnRelMetroPdf', gerarRelatorioMetroPdf); },40); }
-  else if(v==='metro-lista'){ if(!canEdit()){ showView('metro-dash'); return; } main.innerHTML=renderMetroShell(); bindMetro(); }
+  else if(v==='metro-lista'){ main.innerHTML=(isViewer()?`<div class="viewer-banner">Modo visualização — consulta de instrumentos. Sem permissão de edição.</div>`:'')+renderMetroShell(); bindMetro(); }
 
   /* bound above */
   try { replayChartAnimations(main); } catch(e) {}
@@ -3316,6 +3334,7 @@ function bindDocs(){
   paint();
 }
 function openDocModal(id){
+  if(!canEdit()){ alert('Modo visualização — sem permissão de edição.'); return; }
   const d=id?DB.docs.find(x=>x.id===id):null;
   const tipos=LISTA_DOC_TIPOS;
   const crits=LISTA_CRITICIDADE;
@@ -3481,6 +3500,7 @@ function bindFlux(){
   paint();
 }
 function openFluxModal(id){
+  if(!canEdit()){ alert('Modo visualização — sem permissão de edição.'); return; }
   const f=id?DB.fluxos.find(x=>x.id===id):null;
   document.getElementById('modalBox').innerHTML=`
     <div class="modal-head"><h2>${f?'Editar':'Novo'} fluxograma</h2></div>
@@ -3817,6 +3837,7 @@ function bindTrein(){
   paint();
 }
 function openTreinModal(id){
+  if(!canEdit()){ alert('Modo visualização — sem permissão de edição.'); return; }
   const p=id?DB.people.find(x=>x.id===id):null;
   const mods=(p&&p.mods)||{};
   const opts=['','Concluído On-line','Concluído Prático','Apto p/ Mód. Online','Apto p/ Mód. Prático','Inscrito (Online)','Inscrito (Prático)','Reprovado'];
@@ -4204,6 +4225,7 @@ function bindMetro(){
   paint();
 }
 function openMetroModal(id){
+  if(!canEdit()){ alert('Modo visualização — sem permissão de edição.'); return; }
   const i=id?(DB.instruments||[]).find(x=>x.id===id):null;
   const sits=['Ativo','Inativo','Em manutenção','Aguardando calibração'];
   const codigoLocked = !!(i && i.codigo);
@@ -4377,6 +4399,7 @@ function bindNc(){
 }
 
 function openNcModal(row){
+  if(!canEdit()){ alert('Modo visualização — sem permissão de edição.'); return; }
   const MES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   function labelMes(m){
     const s=String(m||'');
@@ -4527,6 +4550,7 @@ function bindDealer(){
 }
 
 function openDealerModal(row){
+  if(!canEdit()){ alert('Modo visualização — sem permissão de edição.'); return; }
   const MES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   function labelMes(m){
     const s=String(m||'');
