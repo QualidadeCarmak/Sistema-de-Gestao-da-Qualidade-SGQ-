@@ -516,6 +516,32 @@ tr:hover td{background:var(--tint)}
 .cal-up-item{font-size:13px;padding:8px 10px;border-radius:8px;background:var(--tint)}
 .cal-up-item b{font-weight:800}
 
+
+/* Gestão treinamentos — grade estilo planilha */
+.tr-grid-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--card);max-height:calc(100vh - 220px)}
+.tr-grid{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;font-size:12px}
+.tr-grid th,.tr-grid td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:6px 8px;vertical-align:middle}
+.tr-grid th{position:sticky;top:0;z-index:2;background:var(--navy);color:#fff;font-size:10px;font-weight:700;text-align:center;white-space:nowrap;line-height:1.25}
+.tr-grid th.tr-sticky-l,.tr-grid td.tr-sticky-l{position:sticky;left:0;z-index:1;background:var(--card);text-align:left;min-width:160px;max-width:220px}
+.tr-grid th.tr-sticky-l{z-index:3;background:var(--navy)}
+.tr-grid th.tr-sticky-r2,.tr-grid td.tr-sticky-r2{position:sticky;left:160px;z-index:1;background:var(--card);min-width:120px;max-width:150px}
+.tr-grid th.tr-sticky-r2{z-index:3;background:var(--navy)}
+.tr-grid tr:hover td{background:var(--tint)}
+.tr-grid tr:hover td.tr-sticky-l,.tr-grid tr:hover td.tr-sticky-r2{background:var(--tint)}
+.st-chip{display:inline-block;padding:3px 6px;border-radius:6px;font-size:10px;font-weight:700;line-height:1.2;white-space:nowrap;max-width:110px;overflow:hidden;text-overflow:ellipsis}
+.st-concl-prat{background:#0B3D2E;color:#E8FFF6}          /* verde escuro — prático concluído */
+.st-concl-on{background:#A8E6C5;color:#0B3D2E}            /* verde claro — online concluído */
+.st-apto-on{background:#FFF3B0;color:#6B5A00}             /* amarelo — apto online */
+.st-apto-prat{background:#FFD08A;color:#6B3A00}           /* laranja — apto prático */
+.st-insc-on{background:#D6EAF8;color:#1B4F72}             /* azul claro — inscrito online */
+.st-insc-prat{background:#AED6F1;color:#1A5276}           /* azul — inscrito prático */
+.st-repr{background:#F5B7B1;color:#7B1E1E}                /* vermelho — reprovado */
+.st-vazio{background:#EEF1F0;color:#7A8A82}               /* cinza — vazio */
+.tr-legend{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;align-items:center}
+.tr-legend span{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
+.tr-pct{font-weight:800;color:var(--navy)}
+body.viewer-mode .tr-grid .btn{display:none!important}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2159,7 +2185,7 @@ const HUBS={
   ]},
   trein:{label:'Treinamentos TO/BT', icon:'🎓', items:[
     {id:'trein-dash',label:'Dashboard',icon:'▣'},
-    {id:'trein-lista',label:'Técnicos',icon:'◎'},
+    {id:'trein-lista',label:'Gestão / Base',icon:'☰'},
     {id:'trein-cal',label:'Calendário 26/27',icon:'📅'}
   ]},
   asec:{label:'ASEC Toyota', icon:'☑', items:[
@@ -3806,34 +3832,150 @@ function renderTrainMap(){
   }
 }
 function renderTreinShell(){
-  return `<div class="page-h"><h1>Técnicos</h1><p>CRUD de status por módulo</p></div>
-  <div class="toolbar"><div class="fg"><label>Busca</label><input id="trQ"></div>
-  <button type="button" class="btn btn-g" id="btnNewTr">+ Técnico</button></div>
-  <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Região</th><th>%</th><th></th></tr></thead><tbody id="trBody"></tbody></table></div>`;
+  const short = {
+    "STEP 1 TO/BT Módulo 1":"S1·1","STEP 1 TO/BT Módulo 2":"S1·2","STEP 1 TO/BT Módulo 3":"S1·3",
+    "STEP 2 TO Módulo 1":"S2·1","STEP 2 TO Módulo 2":"S2·2","STEP 2 TO Módulo 3":"S2·3",
+    "STEP 3 TO Módulo 1":"S3·1","STEP 3 TO Módulo 2":"S3·2","STEP 3 TO Módulo 3":"S3·3",
+    "STEP 1 BT":"BT1","STEP 2 BT":"BT2"
+  };
+  const heads = (MODULES_T||[]).map(m=>`<th title="${esc(m)}">${esc(short[m]||m)}</th>`).join('');
+  return `<div class="page-h">
+    <h1>Gestão de Treinamentos</h1>
+    <p>Base de técnicos e status por módulo (mesmo modelo da planilha). Alterações refletem no Dashboard, mapa e relatórios.</p>
+  </div>
+  <div class="tr-legend">
+    <span><i class="st-chip st-concl-prat">Prático</i> Concluído prático</span>
+    <span><i class="st-chip st-concl-on">Online</i> Concluído online</span>
+    <span><i class="st-chip st-apto-prat">Apto P</i> Apto prático</span>
+    <span><i class="st-chip st-apto-on">Apto O</i> Apto online</span>
+    <span><i class="st-chip st-insc-on">Insc.</i> Inscrito</span>
+    <span><i class="st-chip st-repr">Rep.</i> Reprovado</span>
+  </div>
+  <div class="toolbar">
+    <div class="fg"><label>Busca</label><input id="trQ" placeholder="Nome ou região…"></div>
+    <div class="fg"><label>Filtro UF</label><select id="trUF"><option value="">Todas</option></select></div>
+    <div class="fg"><label>Só com pendência</label>
+      <select id="trPend"><option value="">Todos</option><option value="1">Com módulo vazio / apto / inscrito</option></select>
+    </div>
+    <button type="button" class="btn btn-g" id="btnNewTr">+ Novo técnico</button>
+  </div>
+  <div class="tr-grid-wrap"><table class="tr-grid">
+    <thead><tr>
+      <th class="tr-sticky-l">Nome</th>
+      <th class="tr-sticky-r2">Região</th>
+      <th>%</th>
+      ${heads}
+      <th></th>
+    </tr></thead>
+    <tbody id="trBody"></tbody>
+  </table></div>`;
+}
+function treinStatusClass(st){
+  const s=String(st||'').trim();
+  if(!s) return 'st-vazio';
+  if(/conclu[ií]do\s*pr[aá]tico/i.test(s) || /^conclu[ií]do\s*pr[aá]t/i.test(s)) return 'st-concl-prat';
+  if(/conclu[ií]do\s*on[- ]?line/i.test(s) || /conclu[ií]do\s*online/i.test(s)) return 'st-concl-on';
+  if(/apto.*pr[aá]tico/i.test(s)) return 'st-apto-prat';
+  if(/apto.*on[- ]?line/i.test(s) || /apto.*online/i.test(s)) return 'st-apto-on';
+  if(/inscrito.*pr[aá]tico/i.test(s)) return 'st-insc-prat';
+  if(/inscrito/i.test(s)) return 'st-insc-on';
+  if(/reprov/i.test(s)) return 'st-repr';
+  if(/conclu/i.test(s) && /pr[aá]t/i.test(s)) return 'st-concl-prat';
+  if(/conclu/i.test(s)) return 'st-concl-on';
+  return 'st-vazio';
+}
+function treinStatusShort(st){
+  const s=String(st||'').trim();
+  if(!s) return '—';
+  if(/conclu[ií]do\s*pr[aá]tico/i.test(s)) return 'Conc. Prát.';
+  if(/conclu[ií]do\s*on/i.test(s)) return 'Conc. On.';
+  if(/apto.*pr[aá]tico/i.test(s)) return 'Apto Prát.';
+  if(/apto.*on/i.test(s)) return 'Apto On.';
+  if(/inscrito.*pr[aá]tico/i.test(s)) return 'Insc. Prát.';
+  if(/inscrito/i.test(s)) return 'Inscrito';
+  if(/reprov/i.test(s)) return 'Reprovado';
+  return s.length>14 ? s.slice(0,13)+'…' : s;
+}
+function treinHasPendencia(p){
+  const mods=p.mods||{};
+  const keys=MODULES_T||[];
+  for(let i=0;i<keys.length;i++){
+    const st=String(mods[keys[i]]||'');
+    if(!st) return true;
+    if(/apto|inscrito/i.test(st)) return true;
+  }
+  return false;
 }
 function bindTrein(){
+  const ufSel=document.getElementById('trUF');
+  if(ufSel && ufSel.options.length<=1){
+    const ufs=new Set();
+    (DB.people||[]).forEach(p=>{
+      const e=(p.estado||'').toUpperCase() || ((p.regiao||'').match(/\b([A-Z]{2})\s*$/)||[])[1];
+      if(e) ufs.add(e);
+    });
+    [...ufs].sort().forEach(u=>{
+      const o=document.createElement('option'); o.value=u; o.textContent=u; ufSel.appendChild(o);
+    });
+  }
   const paint=()=>{
     const q=(document.getElementById('trQ').value||'').toLowerCase();
-    let rows=DB.people;
-    if(q) rows=rows.filter(p=>(p.nome+' '+p.regiao).toLowerCase().includes(q));
-    document.getElementById('trBody').innerHTML=rows.map(p=>`<tr>
-      <td><b>${esc(p.nome)}</b></td><td>${esc(p.regiao)}</td><td>${personPct(p)}%</td>
-      <td><button class="btn btn-s" data-ed="${p.id}">Editar</button>
-          <button class="btn btn-d" data-del="${p.id}">Excluir</button></td></tr>`).join('');
-    document.querySelectorAll('#trBody [data-ed]').forEach(b=>b.onclick=()=>openTreinModal(b.dataset.ed));
-    document.querySelectorAll('#trBody [data-del]').forEach(b=>b.onclick=async()=>{
-      if(!confirm('Excluir este técnico (local e Supabase)?')) return;
-      const id=b.dataset.del;
-      const row=(DB.people||[]).find(x=>x.id===id);
-      try{
-        await deleteTecnicoFromCloud(row||{id});
-        DB.people=(DB.people||[]).filter(x=>x.id!==id);
-        saveDB(); paint();
-      }catch(e){ alert('Erro ao excluir na nuvem: '+(e.message||e)); }
+    const uf=(document.getElementById('trUF')&&document.getElementById('trUF').value)||'';
+    const pend=(document.getElementById('trPend')&&document.getElementById('trPend').value)||'';
+    let rows=(DB.people||[]).slice().sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'));
+    if(q) rows=rows.filter(p=>(String(p.nome||'')+' '+String(p.regiao||'')+' '+String(p.estado||'')).toLowerCase().includes(q));
+    if(uf) rows=rows.filter(p=>{
+      const e=(p.estado||'').toUpperCase() || ((p.regiao||'').match(/\b([A-Z]{2})\s*$/)||[])[1]||'';
+      return e===uf;
+    });
+    if(pend==='1') rows=rows.filter(treinHasPendencia);
+    const modsList=MODULES_T||[];
+    document.getElementById('trBody').innerHTML=rows.map(p=>{
+      const cells=modsList.map(m=>{
+        const st=(p.mods&&p.mods[m])||'';
+        const cls=treinStatusClass(st);
+        const lab=treinStatusShort(st);
+        return `<td style="text-align:center" title="${esc(st||'Sem status')}"><span class="st-chip ${cls}">${esc(lab)}</span></td>`;
+      }).join('');
+      const pct=typeof personPct==='function'?personPct(p):0;
+      const id=p.id||'';
+      return `<tr>
+        <td class="tr-sticky-l"><b>${esc(p.nome||'')}</b></td>
+        <td class="tr-sticky-r2">${esc(p.regiao||'')}</td>
+        <td class="tr-pct" style="text-align:center">${pct}%</td>
+        ${cells}
+        <td style="white-space:nowrap">
+          <button type="button" class="btn btn-s" data-ed="${esc(id)}">Editar</button>
+          <button type="button" class="btn btn-d" data-del="${esc(id)}">Excluir</button>
+        </td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="${3+(MODULES_T||[]).length+1}" style="text-align:center;padding:28px;color:var(--muted)">Nenhum técnico encontrado. Clique em + Novo técnico para cadastrar.</td></tr>`;
+
+    document.querySelectorAll('#trBody [data-ed]').forEach(b=>{
+      b.onclick=()=>{ if(!canEdit()){ alert('Modo visualização — sem permissão de edição.'); return; } openTreinModal(b.dataset.ed); };
+    });
+    document.querySelectorAll('#trBody [data-del]').forEach(b=>{
+      b.onclick=async()=>{
+        if(!canEdit()){ alert('Modo visualização — sem permissão de edição.'); return; }
+        if(!confirm('Excluir este técnico (local e Supabase)?')) return;
+        const id=b.dataset.del;
+        const row=(DB.people||[]).find(x=>String(x.id)===String(id));
+        try{
+          await deleteTecnicoFromCloud(row||{id});
+          DB.people=(DB.people||[]).filter(x=>String(x.id)!==String(id));
+          saveDB(); paint();
+        }catch(e){ alert('Erro ao excluir na nuvem: '+(e.message||e)); }
+      };
     });
   };
-  document.getElementById('trQ').oninput=paint;
-  document.getElementById('btnNewTr').onclick=()=>openTreinModal(null);
+  const trQ=document.getElementById('trQ'); if(trQ) trQ.oninput=paint;
+  const trUF=document.getElementById('trUF'); if(trUF) trUF.onchange=paint;
+  const trPend=document.getElementById('trPend'); if(trPend) trPend.onchange=paint;
+  const btn=document.getElementById('btnNewTr');
+  if(btn){
+    if(isViewer()){ btn.style.display='none'; }
+    else btn.onclick=()=>openTreinModal(null);
+  }
   paint();
 }
 function openTreinModal(id){
